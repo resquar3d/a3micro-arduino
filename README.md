@@ -51,14 +51,9 @@ Once you have the app, you can also use the [web controller](#web-controller). A
 
 ### Manual Installation
 
-1. Download the latest release from [https://a3micro.twinsparks.dev/tiers.html](https://a3micro.twinsparks.dev/tiers.html)
-2. Go to your download folder
-3. Move the `A3Micro` folder to your Arduino libraries directory:
-   - Windows: `Documents\Arduino\libraries\`
-   - macOS: `~/Documents/Arduino/libraries/`
-   - Linux: `~/Arduino/libraries/`
-4. Restart Arduino IDE
-5. If you are using the UNO R4 WiFi, also install the [ArduinoBLE](https://docs.arduino.cc/libraries/arduinoble/) library (the Library Manager does this automatically; a manual install does not)
+1. On this repository's GitHub page, click **Code** > **Download ZIP**
+2. In Arduino IDE, go to **Sketch** > **Include Library** > **Add .ZIP Library...** and choose the ZIP you downloaded
+3. If you are using the UNO R4 WiFi, also install the [ArduinoBLE](https://docs.arduino.cc/libraries/arduinoble/) library (the Library Manager does this automatically; a manual install does not)
 
 ## Wiring
 

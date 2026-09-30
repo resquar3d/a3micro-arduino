@@ -2,6 +2,10 @@
 
 Arduino library for Bluetooth Low Energy (BLE) communication between the A3Micro mobile app and Arduino boards, using either an HM-10 Bluetooth module or the built-in BLE radio of the UNO R4 WiFi.
 
+[![Get the A3 Micro app](https://img.shields.io/badge/Get_the_A3_Micro_app-a3micro.twinsparks.dev-e2b762?style=for-the-badge&logo=android&logoColor=white)](https://a3micro.twinsparks.dev/tiers.html)
+
+This library is free and open source. The **A3 Micro app** that controls your board from an Android phone is available at **[a3micro.twinsparks.dev](https://a3micro.twinsparks.dev/tiers.html)**, with a Free edition and Premium and Pro plans. See [Get the A3 Micro app](#get-the-a3-micro-app).
+
 ## Features
 
 - Simple message-based communication protocol
@@ -14,7 +18,27 @@ Arduino library for Bluetooth Low Energy (BLE) communication between the A3Micro
 
 - Arduino UNO R3 or Arduino UNO R4 Minima with an HM-10 BLE module, **or**
 - Arduino UNO R4 WiFi (uses its built-in BLE radio; requires the [ArduinoBLE](https://docs.arduino.cc/libraries/arduinoble/) library)
-- A3Micro mobile app, or the [A3Micro Web Controller](#web-controller) in Chrome
+- The A3 Micro app for Android ([get it here](https://a3micro.twinsparks.dev/tiers.html)), or the [A3Micro Web Controller](#web-controller) in Chrome
+
+## Get the A3 Micro app
+
+The app turns your Android phone into a controller for your board: buttons, switches, sliders, a joystick, a D-pad and value displays, in layouts you can edit. Every example in this library works with it.
+
+| | Free | Premium | Pro |
+|---|---|---|---|
+| Price | Free | €27, one-time | €35, one-time, 12 months |
+| Controls | D-pad, joystick, button A, speed slider | Every control, unlimited layouts | Everything in Premium |
+| Animated HUD skins, sounds and voice | | ✓ | ✓ |
+| Logs, graphs and sync across devices | | | ✓ |
+| New skins and future features | | | ✓ |
+| APK downloads | 2 a year | 3 a year | Unlimited for the 12 months |
+
+1. Go to **[a3micro.twinsparks.dev](https://a3micro.twinsparks.dev/tiers.html)** and register (free).
+2. Download the Free edition, or buy Premium or Pro. Payments go through Stripe.
+3. Install the APK on your Android phone, then open the app.
+4. Upload one of the [examples](#examples) to your board, tap **CONNECT** and pick your board.
+
+Once you have the app, you can also use the [web controller](#web-controller). All sales are final: see the website's terms before buying.
 
 ## Installation
 
@@ -141,9 +165,9 @@ manager.write("status", "ok");
 
 ## Web Controller
 
-The **web controller** (in the separate **a3micro-site** repository, `controller/`) is a browser-based controller that runs in Google Chrome on Android, including Android 16 and Samsung One UI 8.5, and can be installed to the home screen. It has buttons, switches, sliders, a joystick, a D-pad and value displays in layouts you can edit, and it speaks the same message protocol as the A3Micro app, so every example works with it unchanged. See the README in that repository's `controller/` folder for setup.
+The **web controller** is a browser version of the app that runs in Google Chrome on Android, including Android 16 and Samsung One UI 8.5, and can be installed to the home screen. It has the same controls and speaks the same message protocol as the app, so every example works with it unchanged. It opens from your user panel on [a3micro.twinsparks.dev](https://a3micro.twinsparks.dev) once you have the app.
 
-The same controller is also available as a native Android app (A3 Micro, with a Free edition) targeting Android 16. It uses Android's own Bluetooth, so it doesn't need Chrome or web hosting. Download it from the A3 Micro website; the app itself is not part of this repository.
+The native **A3 Micro app** (with a Free edition) targets Android 16 and uses Android's own Bluetooth, so it doesn't need Chrome. [Get it here](https://a3micro.twinsparks.dev/tiers.html). The app itself is not part of this repository.
 
 ## MicroPython
 

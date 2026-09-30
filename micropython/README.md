@@ -1,6 +1,6 @@
 # A3Micro for MicroPython
 
-`a3micro.py` is the MicroPython version of the A3Micro Arduino library. It has the same classes and methods and sends the same `[1][ID][2][VALUE][3]` messages. The A3Micro app and web controller work with it unchanged.
+`a3micro.py` is the MicroPython version of the A3Micro Arduino library. It has the same classes and methods and sends the same `[1][ID][2][VALUE][3]` messages. The A3Micro app ([get it here](https://a3micro.twinsparks.dev/tiers.html)) and web controller work with it unchanged.
 
 In built-in Bluetooth mode the board uses the same Bluetooth service as the UNO R4 WiFi, so the app treats it exactly like an UNO R4 WiFi.
 

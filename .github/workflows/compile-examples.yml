@@ -15,6 +15,23 @@ jobs:
           compliance: specification
           library-manager: submit
 
+  # The MicroPython library and its examples (ESP32, Raspberry Pi Pico W and HM-10 boards):
+  # compiled with mpy-cross, MicroPython's own compiler, so any error in them fails the check
+  micropython:
+    name: MicroPython (ESP32, Pico W)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install mpy-cross
+        run: pipx install mpy-cross
+      - name: Compile the library and examples
+        run: |
+          mpy-cross --version
+          for f in $(find micropython -name '*.py' | sort); do
+            echo "Compiling $f"
+            mpy-cross -o "$RUNNER_TEMP/check.mpy" "$f"
+          done
+
   compile:
     runs-on: ubuntu-latest
     strategy:

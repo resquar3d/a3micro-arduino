@@ -1,0 +1,28 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+desktop.ini
+Thumbs.db
+ehthumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+
+# Never in this repository: app files and signing keys (kept in ../a3micro-private)
+*.apk
+*.aab
+*.keystore
+*.jks
+keystore.properties
+keys/

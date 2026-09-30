@@ -1,0 +1,69 @@
+name: Compile Examples
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Arduino Lint
+        uses: arduino/arduino-lint-action@v2
+        with:
+          compliance: specification
+          library-manager: update
+
+  compile:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: UNO R3
+            fqbn: arduino:avr:uno
+            platform: arduino:avr
+            libraries: |
+              - source-path: ./
+            sketch-paths: |
+              - examples/HM10_BLE_READ_LED
+              - examples/HM10_BLE_WRITE_BUTTON
+              - examples/HM10_BLE_WRITE_REPEAT
+              - examples/HM10_BLE_WRITE_ULTRASONIC_SENSOR
+              - examples/Rename_HM10_Bluetooth
+              - examples/UNO_R3_LED
+              - examples/UNO_R3_RGB_LED
+          - name: UNO R4 Minima
+            fqbn: arduino:renesas_uno:minima
+            platform: arduino:renesas_uno
+            libraries: |
+              - source-path: ./
+            sketch-paths: |
+              - examples/UNO_R4_MINIMA_LED
+              - examples/UNO_R4_MINIMA_RGB_LED
+          - name: UNO R4 WiFi
+            fqbn: arduino:renesas_uno:unor4wifi
+            platform: arduino:renesas_uno
+            libraries: |
+              - source-path: ./
+              - name: ArduinoBLE
+              - name: Servo
+            sketch-paths: |
+              - examples/UNO_R4_WIFI_HUD_DRIVE
+              - examples/UNO_R4_WIFI_LED
+              - examples/UNO_R4_WIFI_SERVO
+              - examples/UNO_R4_WIFI_WRITE_BUTTON
+
+    name: Compile for ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile examples
+        uses: arduino/compile-sketches@v1
+        with:
+          fqbn: ${{ matrix.fqbn }}
+          platforms: |
+            - name: ${{ matrix.platform }}
+          libraries: ${{ matrix.libraries }}
+          sketch-paths: ${{ matrix.sketch-paths }}
+          verbose: false

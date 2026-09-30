@@ -30,7 +30,7 @@ The app turns your Android phone into a controller for your board: buttons, swit
 | Controls | D-pad, joystick, button A, speed slider | Every control, unlimited layouts | Everything in Premium |
 | Animated HUD skins, sounds and voice | | ✓ | ✓ |
 | Logs, graphs and sync across devices | | | ✓ |
-| New skins and future features | | | ✓ |
+| New app versions, skins and features | | | ✓ (during the 12 months) |
 | APK downloads | 2 a year | 3 a year | Unlimited for the 12 months |
 
 1. Go to **[a3micro.twinsparks.dev](https://a3micro.twinsparks.dev/tiers.html)** and register (free).

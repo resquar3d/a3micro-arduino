@@ -27,8 +27,8 @@ Arduino library for Bluetooth Low Energy (BLE) communication between the A3Micro
 
 ### Manual Installation
 
-1. Download the latest release from [www.twinsparksdevelopment.com](https://www.twinsparksdevelopment.com)
-2. Extract the ZIP file
+1. Download the latest release from [https://a3micro.twinsparks.dev/tiers.html](https://a3micro.twinsparks.dev/tiers.html)
+2. Go to your download folder
 3. Move the `A3Micro` folder to your Arduino libraries directory:
    - Windows: `Documents\Arduino\libraries\`
    - macOS: `~/Documents/Arduino/libraries/`

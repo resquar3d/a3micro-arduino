@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The A3 Micro controller is now the Android app only: the browser-based web controller has been retired. Get the app at https://a3micro.twinsparks.dev/tiers.html.
 - **Breaking:** renamed the library to A3Micro. The header is now `A3Micro.h` and the classes are `A3MicroManager` and `A3MicroMessage`. The default BLE device name is now "A3Micro". The BLE UUIDs and message protocol are unchanged.
 - Fixed lost messages on the UNO R4 WiFi (built-in BLE).
   - `read()` only saw the characteristic's latest value, so a message was lost whenever another arrived before `loop()` called `read()` again. This dropped the press of a quick button tap and the value of one slider when two moved together.

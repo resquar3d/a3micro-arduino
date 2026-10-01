@@ -4,7 +4,7 @@ a3micro.py
 Description:
 MicroPython port of the A3Micro Arduino library. It sends and receives the same
 [1][ID][2][VALUE][3] messages as A3Micro.cpp, with the same classes and methods,
-so the A3Micro app and web controller work with MicroPython boards unchanged.
+so the A3Micro app works with MicroPython boards unchanged.
 
 Two transports, like the Arduino library:
   manager = A3MicroManager()         # the board's built-in BLE radio (ESP32, Pico W, ...)

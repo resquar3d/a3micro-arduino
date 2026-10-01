@@ -18,7 +18,7 @@ This library is free and open source. The **A3 Micro app** that controls your bo
 
 - Arduino UNO R3 or Arduino UNO R4 Minima with an HM-10 BLE module, **or**
 - Arduino UNO R4 WiFi (uses its built-in BLE radio; requires the [ArduinoBLE](https://docs.arduino.cc/libraries/arduinoble/) library)
-- The A3 Micro app for Android ([get it here](https://a3micro.twinsparks.dev/tiers.html)), or the [A3Micro Web Controller](#web-controller) in Chrome
+- The A3 Micro app for Android ([get it here](https://a3micro.twinsparks.dev/tiers.html))
 
 ## Get the A3 Micro app
 
@@ -38,7 +38,7 @@ The app turns your Android phone into a controller for your board: buttons, swit
 3. Install the APK on your Android phone, then open the app.
 4. Upload one of the [examples](#examples) to your board, tap **CONNECT** and pick your board.
 
-Once you have the app, you can also use the [web controller](#web-controller). All sales are final: see the website's terms before buying.
+All sales are final: see the website's terms before buying.
 
 ## Installation
 
@@ -158,15 +158,13 @@ The same `begin()`/`isConnected()`/`read()`/`write()` calls work in HM-10 mode t
 manager.write("status", "ok");
 ```
 
-## Web Controller
+## The A3 Micro app
 
-The **web controller** is a browser version of the app that runs in Google Chrome on Android, including Android 16 and Samsung One UI 8.5, and can be installed to the home screen. It has the same controls and speaks the same message protocol as the app, so every example works with it unchanged. It opens from your user panel on [a3micro.twinsparks.dev](https://a3micro.twinsparks.dev) once you have the app.
-
-The native **A3 Micro app** (with a Free edition) targets Android 16 and uses Android's own Bluetooth, so it doesn't need Chrome. [Get it here](https://a3micro.twinsparks.dev/tiers.html). The app itself is not part of this repository.
+The **A3 Micro app** (with a Free edition) targets Android 16, including Samsung One UI 8.5, and uses Android's own Bluetooth. It speaks the message protocol below, so every example works with it unchanged. [Get it here](https://a3micro.twinsparks.dev/tiers.html). The app itself is not part of this repository.
 
 ## MicroPython
 
-[`micropython`](micropython) has `a3micro.py`, a MicroPython version of this library with the same classes, methods and messages. It works on boards with built-in Bluetooth, such as the ESP32 and Raspberry Pi Pico W, and with an HM-10 module on a UART. The app and web controller treat these boards exactly like an UNO R4 WiFi. See its [README](micropython/README.md).
+[`micropython`](micropython) has `a3micro.py`, a MicroPython version of this library with the same classes, methods and messages. It works on boards with built-in Bluetooth, such as the ESP32 and Raspberry Pi Pico W, and with an HM-10 module on a UART. The app treats these boards exactly like an UNO R4 WiFi. See its [README](micropython/README.md).
 
 ## Message Protocol
 

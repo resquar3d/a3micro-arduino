@@ -1,5 +1,5 @@
 /*
- * A3Micro.h
+ * A3Micro library - src/A3Micro.h
  *
  * Description:
  * Header file defining classes for BLE (Bluetooth Low Energy) message handling on Arduino.

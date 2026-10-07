@@ -2,13 +2,12 @@
 
 ## Unreleased
 
-- Library sources moved to `src/` (the Arduino 1.5 library layout). Sketches are unchanged: they still `#include "A3Micro.h"`.
 - The A3 Micro controller is now the Android app only: the browser-based web controller has been retired. Get the app at https://a3micro.twinsparks.dev/tiers.html.
 - **Breaking:** renamed the library to A3Micro. The header is now `A3Micro.h` and the classes are `A3MicroManager` and `A3MicroMessage`. The default BLE device name is now "A3Micro". The BLE UUIDs and message protocol are unchanged.
 - Fixed lost messages on the UNO R4 WiFi (built-in BLE).
   - `read()` only saw the characteristic's latest value, so a message was lost whenever another arrived before `loop()` called `read()` again. This dropped the press of a quick button tap and the value of one slider when two moved together.
   - Every write is now queued, and `read()` returns the messages one per call, in order, like HM-10 mode. A write without the end delimiter still counts as a whole frame.
-- Added the MicroPython library (`micropython/a3micro.py`) with the same API and messages as the Arduino library. It supports built-in BLE (ESP32, Pico W) using the UNO R4 WiFi's service UUIDs, and HM-10 modules on a UART. Examples: `led.py`, `write_button.py`, `hm10_led.py`.
+- Added the MicroPython library (`extras/micropython/a3micro.py`) with the same API and messages as the Arduino library. It supports built-in BLE (ESP32, Pico W) using the UNO R4 WiFi's service UUIDs, and HM-10 modules on a UART. Examples: `led.py`, `write_button.py`, `hm10_led.py`.
 - Web controller and Android app: also connect to boards using the Nordic UART Service (MicroPython BLE UART).
 - Web controller and Android app: new **Reactor drive** control.
   - A round HUD control. The inner ring is a 4-way direction pad sending `up`/`down`/`left`/`right`/`stop`, like the D-pad.

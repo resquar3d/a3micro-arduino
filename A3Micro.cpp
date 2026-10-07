@@ -1,5 +1,5 @@
 /*
- * A3Micro library - src/A3Micro.cpp
+ * A3Micro.cpp
  *
  * Description:
  * Source file implementing the `A3MicroMessage` and `A3MicroManager` classes. Provides

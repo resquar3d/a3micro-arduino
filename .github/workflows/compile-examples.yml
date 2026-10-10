@@ -48,7 +48,7 @@ jobs:
               - examples/HM10_BLE_WRITE_BUTTON
               - examples/HM10_BLE_WRITE_REPEAT
               - examples/HM10_BLE_WRITE_ULTRASONIC_SENSOR
-              - examples/Rename_HM10_Bluetooth
+              - examples/HM10_SETUP
               - examples/UNO_R3_LED
               - examples/UNO_R3_RGB_LED
           - name: UNO R4 Minima

@@ -1,5 +1,18 @@
 # Changelog
 
+## 3.0.0
+
+- **New A3Micro protocol** (breaking): every message, in both directions, is `##;label:value,label:value;##`. Several values travel in one message, and a `;` `:` `,` `#` or `%` inside a label or value is sent as `%3B` `%3A` `%2C` `%23` `%25`. Needs the A3 Micro app 1.8 or newer.
+- **A joystick sends two labels** in one message, `j0x` and `j0y`, instead of one `"x,y"` value.
+- **New API**, written from scratch: `A3Micro` (the link: `begin`, `connected`, `receive`, `send`) and `A3MicroPacket` (one message: `add`, `has`, `get`, `getInt`, `getFloat`, `getBool`, `toMessage`). See "Moving from version 2" in the README.
+- **New Bluetooth LE service** for boards with their own radio: `A3C10000-9A58-4589-AD8F-6FCC3C2BF21A`, characteristic `A3C10001-9A58-4589-AD8F-6FCC3C2BF21A`.
+- Messages that arrive in pieces are joined up again on every link; a message that loses its end is skipped at the next start.
+- The board's replies are sent in 20-byte notifications on the UNO R4 WiFi and MicroPython boards, so long readings reach every phone.
+- MicroPython library rewritten to match: `A3Micro`, `A3MicroPacket`, `receive()`, `send()`, `send_packet()`.
+- All examples rewritten. `HUD_DRIVE` reads `j0x` / `j0y` and reports the battery (`bat`); `WRITE_REPEAT` sends two readings in one message; `SERVO` reports the angle.
+- New example `HM10_SETUP` (name and check an HM-10 with AT commands); the GPL-licensed `Rename_HM10_Bluetooth` example was removed.
+- License: MIT, Copyright R.E Espino, TwinSparks Development. All code in this version is newly written.
+
 ## Unreleased
 
 - The A3 Micro controller is now the Android app only: the browser-based web controller has been retired. Get the app at https://a3micro.twinsparks.dev/tiers.html.

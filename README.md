@@ -1,23 +1,25 @@
 # A3Micro
 
-Arduino library for Bluetooth Low Energy (BLE) communication between the A3Micro mobile app and Arduino boards, using either an HM-10 Bluetooth module or the built-in BLE radio of the UNO R4 WiFi.
+Arduino library for the **A3Micro Control** app: control your board from an Android phone over Bluetooth LE, with an HM-10 module on any board or the built-in radio of the UNO R4 WiFi. A MicroPython version for the ESP32 and Raspberry Pi Pico W is in [`micropython`](micropython).
 
 [![Get the A3 Micro app](https://img.shields.io/badge/Get_the_A3_Micro_app-a3micro.twinsparks.dev-e2b762?style=for-the-badge&logo=android&logoColor=white)](https://a3micro.twinsparks.dev/tiers.html)
 
-This library is free and open source. The **A3 Micro app** that controls your board from an Android phone is available at **[a3micro.twinsparks.dev](https://a3micro.twinsparks.dev/tiers.html)**, with a Free edition and Premium and Pro plans. See [Get the A3 Micro app](#get-the-a3-micro-app).
+This library is free and open source. The **A3 Micro app** that controls your board is available at **[a3micro.twinsparks.dev](https://a3micro.twinsparks.dev/tiers.html)**, with a Free edition and Premium and Pro plans. See [Get the A3 Micro app](#get-the-a3-micro-app).
+
+> **Version 3 uses the new A3Micro protocol** (`##;label:value,...;##`). It needs the A3 Micro app **1.8 or newer**, and sketches written for version 2 need the small changes in [Moving from version 2](#moving-from-version-2).
 
 ## Features
 
-- Simple message-based communication protocol
-- Easy-to-use API for reading and writing BLE messages
-- Support for command ID and value pairs
-- Compatible with Arduino UNO R3 and R4 boards
-- One `A3MicroManager` class for both transports: HM-10 BLE modules on any board, or the UNO R4 WiFi's built-in BLE (no HM-10 needed)
+- One readable text protocol in both directions: `##;j1x:273,j1y:120;##`
+- Several values in one message (a joystick's x and y, a set of sensor readings)
+- One `A3Micro` class for both links: an HM-10 module on a serial port, or the UNO R4 WiFi's own Bluetooth LE
+- Never blocks: `receive()` returns straight away, messages that arrive in pieces are put back together
+- Typed helpers: `getInt`, `getFloat`, `getBool`, and `send` for numbers and text
 
-## Hardware Requirements
+## Hardware
 
-- Arduino UNO R3 or Arduino UNO R4 Minima with an HM-10 BLE module, **or**
-- Arduino UNO R4 WiFi (uses its built-in BLE radio; requires the [ArduinoBLE](https://docs.arduino.cc/libraries/arduinoble/) library)
+- Arduino UNO R3 or UNO R4 Minima with an HM-10 Bluetooth LE module, **or**
+- Arduino UNO R4 WiFi (its own radio; uses the [ArduinoBLE](https://docs.arduino.cc/libraries/arduinoble/) library)
 - The A3 Micro app for Android ([get it here](https://a3micro.twinsparks.dev/tiers.html))
 
 ## Get the A3 Micro app
@@ -42,206 +44,172 @@ All sales are final: see the website's terms before buying.
 
 ## Installation
 
-### Via Arduino Library Manager
+### Arduino Library Manager
 
-1. Open Arduino IDE
-2. Go to **Sketch** > **Include Library** > **Manage Libraries**
-3. Search for "A3Micro"
-4. Click **Install**
+1. Open the Arduino IDE.
+2. Go to **Sketch > Include Library > Manage Libraries**.
+3. Search for "A3Micro" and click **Install**.
 
-### Manual Installation
+### From GitHub
 
-1. On this repository's GitHub page, click **Code** > **Download ZIP**
-2. In Arduino IDE, go to **Sketch** > **Include Library** > **Add .ZIP Library...** and choose the ZIP you downloaded
-3. If you are using the UNO R4 WiFi, also install the [ArduinoBLE](https://docs.arduino.cc/libraries/arduinoble/) library (the Library Manager does this automatically; a manual install does not)
+1. On this repository's page, click **Code > Download ZIP**.
+2. In the Arduino IDE, go to **Sketch > Include Library > Add .ZIP Library...** and choose the ZIP.
+3. For the UNO R4 WiFi, also install [ArduinoBLE](https://docs.arduino.cc/libraries/arduinoble/) (the Library Manager does this for you; a ZIP install does not).
 
 ## Wiring
 
-No wiring is needed for BLE on the Arduino UNO R4 WiFi — it uses the built-in radio.
+The UNO R4 WiFi needs no wiring: it uses its own radio.
 
-For other boards, connect the HM-10 module to your Arduino:
+For other boards, connect an HM-10:
 
-| HM-10 Pin | Arduino UNO R3 Pin          | Arduino UNO R4 Minima Pin |
-|-----------|-----------------------------|---------------------------|
-| VCC       | 5V                          | 5V                        |
-| GND       | GND                         | GND                       |
-| TXD       | Pin 7 (RX, SoftwareSerial)  | Pin 0 (RX, Serial1)       |
-| RXD       | Pin 8 (TX, SoftwareSerial)  | Pin 1 (TX, Serial1)       |
+| HM-10 | UNO R3 | UNO R4 Minima |
+|---|---|---|
+| VCC | 5V | 5V |
+| GND | GND | GND |
+| TXD | pin 7 (SoftwareSerial RX) | pin 0 (Serial1 RX) |
+| RXD | pin 8 (SoftwareSerial TX), through a 5 V to 3.3 V divider | pin 1 (Serial1 TX), through a 5 V to 3.3 V divider |
 
-The UNO R3 has a single hardware UART, which is used for USB, so the HM-10 examples use `SoftwareSerial` on pins 7 and 8. The UNO R4 Minima has a second hardware UART (`Serial1`) on pins 0 and 1, so the R4 Minima examples pass `Serial1` to `A3MicroManager` instead — no `SoftwareSerial` needed.
+The UNO R3's only hardware serial port is used for USB, so its examples use `SoftwareSerial` on pins 7 and 8. The UNO R4 Minima has a second port, `Serial1`, on pins 0 and 1. HM-10 modules talk at 9600 baud out of the box, which every example uses. To give the module its own name, upload **HM10_SETUP** and send `AT+NAMEYourName`.
 
-The HM-10 module ships with a default baud rate of 9600, which is what every example uses.
+## The A3Micro protocol
+
+Every message, in both directions, is one line of text:
+
+```
+##;label1:value1,label2:value2,...,labelN:valueN;##
+```
+
+| Part | Meaning |
+|---|---|
+| `##` | Start of the message |
+| `;` | Separates the start and end markers from the pairs |
+| `label` | What the value is: `j1x` (joystick 1, x direction), `sl0` (slider 0), `bat` (battery) |
+| `:` | Between a label and its value |
+| `value` | The value, as text: `273`, `on`, `3.71` |
+| `,` | Between two pairs |
+| `##` | End of the message |
+
+The app sends one message for each action: a button press, a moved slider or joystick, a Send. A joystick sends its two directions together, `##;j0x:40,j0y:85;##`. The board answers in the same format, for example its battery voltage and a measured distance, `##;bat:3.71,dist:42;##`; a display in the app with that label shows the value.
+
+A `;` `:` `,` `#` or `%` inside a label or value is sent as `%3B` `%3A` `%2C` `%23` `%25`, so text typed in the app can never break a message. The library encodes and decodes this for you.
+
+Bluetooth LE: the UNO R4 WiFi (and MicroPython boards) offer the A3Micro service `A3C10000-9A58-4589-AD8F-6FCC3C2BF21A` with one characteristic, `A3C10001-9A58-4589-AD8F-6FCC3C2BF21A` (write from the app, notify to the app). HM-10 modules use their own serial service; the app finds either.
 
 ## Usage
 
-### Basic Example - LED Control
+### Receive: an LED from a button in the app
 
 ```cpp
-#include "A3Micro.h"
-#include "SoftwareSerial.h"
+#include <A3Micro.h>
+#include <SoftwareSerial.h>
 
-// Setup BLE communication
-const int rXPin = 7;
-const int tXPin = 8;
-SoftwareSerial SSerial(rXPin, tXPin);
-
-// Create A3Micro manager
-A3MicroManager manager(SSerial);
-
-const int LED = 13;
+SoftwareSerial bleSerial(7, 8);
+A3Micro a3(bleSerial);              // HM-10 on pins 7 and 8
+// A3Micro a3;                      // UNO R4 WiFi: its own radio
 
 void setup() {
-  Serial.begin(9600);
-  SSerial.begin(9600);
-  manager.begin();  // Initialize A3Micro messaging
-  pinMode(LED, OUTPUT);
+  bleSerial.begin(9600);
+  a3.begin();                       // on the UNO R4 WiFi: a3.begin("My Robot")
+  pinMode(13, OUTPUT);
 }
 
 void loop() {
-  // Only handle messages while the A3Micro app is connected
-  if (manager.isConnected()) {
-    // Read message from BLE
-    A3MicroMessage msg = manager.read();
-
-    // Check if message is valid
-    if (msg.hasId() && msg.hasValue()) {
-      Serial.println(msg.toString());
-    }
-
-    // Control LED based on message
-    if (msg.id == "b0") {
-      if (msg.value == "1") {
-        digitalWrite(LED, HIGH);
-      } else if (msg.value == "0") {
-        digitalWrite(LED, LOW);
-      }
-    }
+  A3MicroPacket in;
+  if (a3.receive(in) && in.has("b0")) {
+    digitalWrite(13, in.getBool("b0") ? HIGH : LOW);
   }
 }
 ```
 
-### UNO R4 WiFi - Built-in BLE
-
-On the UNO R4 WiFi, construct `A3MicroManager` with no arguments to use the board's built-in BLE radio — no HM-10 or SoftwareSerial needed:
+### A joystick
 
 ```cpp
-#include "A3Micro.h"
-
-A3MicroManager manager; // no argument = built-in BLE
-
-const int LED = 13;
-
-void setup() {
-  Serial.begin(9600);
-  if (!manager.begin("UNO R4 WIFI")) {
-    Serial.println("Starting BLE failed!");
-  }
-  pinMode(LED, OUTPUT);
-}
-
-void loop() {
-  if (manager.isConnected()) {
-    A3MicroMessage msg = manager.read();
-    if (msg.id == "b0") {
-      digitalWrite(LED, msg.value == "1" ? HIGH : LOW);
-    }
-  }
+A3MicroPacket in;
+if (a3.receive(in)) {
+  if (in.has("j0x")) x = in.getInt("j0x");    // -100 .. 100
+  if (in.has("j0y")) y = in.getInt("j0y");
 }
 ```
 
-The same `begin()`/`isConnected()`/`read()`/`write()` calls work in HM-10 mode too (`begin()` and `isConnected()` are harmless no-ops there, since the HM-10 manages the connection itself), so sketches can share one structure across all boards.
-
-### Send Data to A3Micro
+### Send: readings to the app
 
 ```cpp
-// Send [1][status][2][ok][3]
-manager.write("status", "ok");
+a3.send("dist", 42);                // ##;dist:42;##
+a3.send("bat", 3.71);               // ##;bat:3.71;##
+
+A3MicroPacket out;                  // several at once: ##;bat:3.71,dist:42;##
+out.add("bat", 3.71);
+out.add("dist", 42);
+a3.send(out);
 ```
 
-## The A3 Micro app
+## API reference
 
-The **A3 Micro app** (with a Free edition) targets Android 16, including Samsung One UI 8.5, and uses Android's own Bluetooth. It speaks the message protocol below, so every example works with it unchanged. [Get it here](https://a3micro.twinsparks.dev/tiers.html). The app itself is not part of this repository.
+### `A3Micro`, the link
 
-## MicroPython
+| | |
+|---|---|
+| `A3Micro a3(stream)` | An HM-10 (or similar serial Bluetooth module) on a `Stream`: `SoftwareSerial`, `Serial1`, ... |
+| `A3Micro a3` | The UNO R4 WiFi's own radio (needs ArduinoBLE) |
+| `bool begin(name = "A3Micro")` | Starts advertising as `name` (own radio); `false` if the radio didn't start. With a serial module it does nothing and returns `true`. |
+| `bool connected()` | `true` while the app is connected (own radio). A serial module can't tell, so it is always `true`. |
+| `bool receive(A3MicroPacket &in)` | `true` with the next complete message in `in`; `false` when nothing new has arrived. Never waits; one message per call. |
+| `send(packet)` | Sends a packet |
+| `send(label, value)` | Sends one pair; `value` can be text, a whole number or a decimal (`send("v", 3.14159, 3)` for 3 decimals) |
 
-[`micropython`](micropython) has `a3micro.py`, a MicroPython version of this library with the same classes, methods and messages. It works on boards with built-in Bluetooth, such as the ESP32 and Raspberry Pi Pico W, and with an HM-10 module on a UART. The app treats these boards exactly like an UNO R4 WiFi. See its [README](micropython/README.md).
+### `A3MicroPacket`, one message
 
-## Message Protocol
+| | |
+|---|---|
+| `bool add(label, value)` | Adds a pair: text, whole numbers, decimals (2 places, or `add("v", x, 3)`), `true`/`false` (sent as 1/0). `false` when it is full (8 pairs). |
+| `uint8_t size()`, `bool empty()` | How many pairs it holds |
+| `label(i)`, `value(i)` | Pair number `i`, in the order they came |
+| `bool has(label)` | Whether the label is in the message |
+| `String get(label, fallback = "")` | The value as text |
+| `long getInt(label, fallback = 0)` | The value as a whole number |
+| `float getFloat(label, fallback = 0)` | The value as a decimal |
+| `bool getBool(label, fallback = false)` | `1`, `on`, `true`, `yes`, `high` are true; `0`, `off`, `false`, `no`, `low` are false |
+| `String toMessage()` | The whole message as sent, handy for `Serial.println` |
+| `clear()` | Empties it |
 
-Messages follow this format:
-```
-[1][ID][2][VALUE][3]
-```
-
-- Byte 1: Start delimiter
-- ID: Command identifier (e.g., "b0" for button 0)
-- Byte 2: Separator
-- VALUE: Command value (e.g., "1" for on, "0" for off)
-- Byte 3: End delimiter
-
-## API Reference
-
-### A3MicroMessage
-
-Represents a BLE message with an ID and value.
-
-#### Properties
-- `String id` - Message identifier
-- `String value` - Message value
-
-#### Methods
-- `bool hasId()` - Returns true if ID is non-empty
-- `bool hasValue()` - Returns true if value is non-empty
-- `String toString()` - Returns formatted string "id:[ID] value:[VALUE]"
-- `static A3MicroMessage parse(const uint8_t *buffer, size_t size)` - Parses a raw `[1][ID][2][VALUE][3]` frame into a message; the value is lowercased and stripped of spaces
-
-### A3MicroManager
-
-Manages BLE communication and message parsing. One class, two transports.
-
-#### Constructors
-- `A3MicroManager(Stream &s)` - HM-10 mode: initialize with the module's Stream (Serial or SoftwareSerial)
-- `A3MicroManager()` - Built-in BLE mode: use the board's own radio (UNO R4 WiFi only; requires ArduinoBLE)
-
-#### Methods
-- `bool begin(const char *deviceName = "A3Micro")` - Start BLE advertising under the given name; returns false if the radio fails to start. In HM-10 mode this is a no-op returning true (the module advertises on its own).
-- `bool isConnected()` - Returns true while the A3Micro app is connected. In HM-10 mode the connection state isn't visible, so this always returns true.
-- `A3MicroMessage read()` - Read and parse the latest message; returns an empty message if nothing new arrived
-- `void write(const String &id, const String &value)` - Send a message to the app in the format `[1][ID][2][VALUE][3]`
+Limits (change them with a `#define` before `#include <A3Micro.h>`): `A3MICRO_MAX_PAIRS` 8 pairs per message, `A3MICRO_MAX_MESSAGE` 160 characters.
 
 ## Examples
 
 Open them from **File > Examples > A3Micro** in the Arduino IDE.
 
-### UNO R3 with HM-10 (SoftwareSerial on pins 7/8)
+**UNO R3 (or any board) with an HM-10 on pins 7 / 8**
+- **UNO_R3_LED**, **HM10_BLE_READ_LED**: a button in the app (`b0`) switches the LED on pin 13
+- **UNO_R3_RGB_LED**: three sliders (`sl0`, `sl1`, `sl2`) mix an RGB LED
+- **HM10_BLE_WRITE_BUTTON**: a push button on the board shows in the app (`btn`)
+- **HM10_BLE_WRITE_REPEAT**: a counter and the uptime, together, every second (`count`, `up`)
+- **HM10_BLE_WRITE_ULTRASONIC_SENSOR**: HC-SR04 distance, ten times a second (`dist`)
+- **HM10_SETUP**: name and check an HM-10 with AT commands from the Serial Monitor
 
-- **UNO_R3_LED** - Simple LED on/off control
-- **UNO_R3_RGB_LED** - RGB LED color control from three sliders
-- **HM10_BLE_READ_LED** - Minimal read example: toggle the onboard LED from the app
-- **HM10_BLE_WRITE_BUTTON** - Send button presses and releases to the app
-- **HM10_BLE_WRITE_REPEAT** - Send an alternating 1/0 value every second
-- **HM10_BLE_WRITE_ULTRASONIC_SENSOR** - Send HC-SR04 distance readings to the app
+**UNO R4 Minima with an HM-10 on Serial1 (pins 0 / 1)**
+- **UNO_R4_MINIMA_LED**, **UNO_R4_MINIMA_RGB_LED**: the same as the UNO R3 versions
 
-### UNO R4 Minima with HM-10 (Serial1 on pins 0/1)
+**UNO R4 WiFi, its own radio**
+- **UNO_R4_WIFI_LED**: the LED from the app's `b0`
+- **UNO_R4_WIFI_SERVO**: slider `sl0` turns a servo; the board reports the angle (`angle`)
+- **UNO_R4_WIFI_WRITE_BUTTON**: a push button on the board shows in the app (`btn`)
+- **UNO_R4_WIFI_HUD_DRIVE**: a two-motor robot for the app's HUD Drive layout. Direction ring `r0`, knob `j0x` / `j0y`, speed `sp0`, lights `sw0`, horn `b1`, LED `b0`, servo `sl0`, aux `sl1`; it reports its battery as `bat`. The motors stop on `stop` and when the app disconnects.
 
-- **UNO_R4_MINIMA_LED** - Simple LED on/off control
-- **UNO_R4_MINIMA_RGB_LED** - RGB LED color control from three sliders
+## Moving from version 2
 
-### UNO R4 WiFi with built-in BLE (no HM-10)
+Version 3 replaces the old message format and API, so the app and the board must both be updated: the A3 Micro app 1.8 (or newer) and this library 3.
 
-- **UNO_R4_WIFI_LED** - Simple LED on/off control
-- **UNO_R4_WIFI_SERVO** - Servo control from a slider
-- **UNO_R4_WIFI_WRITE_BUTTON** - Send button presses and releases to the app
-- **UNO_R4_WIFI_HUD_DRIVE** - Two-motor robot for the app's HUD Drive layout. The reactor ring sends the direction on `r0`, its center knob sends a joystick position on `j0` for smooth steering, and its speedometer sends the top speed on `sp0`. The layout also has lights (`sw0`), a horn (`b1`), the LED (`b0`), a servo (`sl0`) and an aux output (`sl1`). The motors stop on `stop` and when the app disconnects.
+| Version 2 | Version 3 |
+|---|---|
+| `A3MicroManager manager(SSerial);` | `A3Micro a3(SSerial);` |
+| `A3MicroManager manager;` (UNO R4 WiFi) | `A3Micro a3;` |
+| `manager.isConnected()` | `a3.connected()` |
+| `A3MicroMessage msg = manager.read();` then `if (msg.id == "b0") ... msg.value` | `A3MicroPacket in; if (a3.receive(in)) ... in.has("b0") ... in.get("b0")` / `in.getInt("b0")` |
+| A joystick's `j0` with the value `"x,y"` | Two labels in one message: `j0x` and `j0y` |
+| `manager.write("dist", String(d));` | `a3.send("dist", d);` |
 
-### Utilities
-
-- **Rename_HM10_Bluetooth** - Rename and configure an HM-10 module over AT commands (GPL v3, see License below)
+Values are no longer lowercased or stripped of spaces: what the app sends is what you get (`getBool` accepts `on`, `ON`, `1`, ...).
 
 ## License
 
-Developed for TwinSparks Development ([www.twinsparksdevelopment.com](https://www.twinsparksdevelopment.com)). Modified and written by R.E Espino of [twinsparks.dev](https://twinsparks.dev).
-
-MIT License — Copyright (c) 2026 R.E Espino, TwinSparks Development; based on original work Copyright (c) 2026 A+ Mobile Solutions Inc. See [LICENSE](LICENSE) for details.
-
-**Exception:** the `Rename_HM10_Bluetooth` example is a standalone HM-10 configuration utility originally written by Arik Yavilevich and modified by Anurag Purwar. It is distributed under the [GPL v3](https://www.gnu.org/licenses/gpl-3.0.html), not MIT. It does not include or link against the A3Micro library, so the library itself and all other examples remain MIT.
+MIT License, Copyright (c) 2026 R.E Espino, TwinSparks Development ([www.twinsparksdevelopment.com](https://www.twinsparksdevelopment.com)). See [LICENSE](LICENSE).

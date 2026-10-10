@@ -1,257 +1,306 @@
 /*
- * A3Micro.cpp
+ * A3Micro.cpp - the A3Micro protocol: ##;label:value,...;## (see A3Micro.h)
  *
- * Description:
- * Source file implementing the `A3MicroMessage` and `A3MicroManager` classes. Provides
- * methods to receive, parse, and process BLE messages for control tasks on Arduino, such as
- * handling commands to operate devices. `A3MicroManager` supports both an HM-10 BLE module
- * on a serial stream and (on the UNO R4 WiFi) the board's built-in BLE radio.
- *
- * Developed for TwinSparks Development (www.twinsparksdevelopment.com)
- * Modified and written by R.E Espino of twinsparks.dev
- * Licensed under the MIT License. See LICENSE for details.
+ * Copyright (c) 2026 R.E Espino, TwinSparks Development (www.twinsparksdevelopment.com)
+ * Released under the MIT License (see LICENSE).
  */
 
 #include "A3Micro.h"
 
-// Constructor for A3MicroMessage
-A3MicroMessage::A3MicroMessage()
-  : id(""), value("") {}
+/* ---------------------------------------------------------------------------------------------------------------
+ * A3MicroPacket: a list of label:value pairs
+ * ------------------------------------------------------------------------------------------------------------- */
 
-// Checks if the message has a non-empty ID
-bool A3MicroMessage::hasId() const {
-  return id.length() > 0;
-}
+A3MicroPacket::A3MicroPacket() : _count(0) {}
 
-// Checks if the message has a non-empty value
-bool A3MicroMessage::hasValue() const {
-  return value.length() > 0;
-}
-
-// Converts the message to a readable string format
-String A3MicroMessage::toString() const {
-  return "id:" + id + " value:" + value;
-}
-
-// Parses a raw frame in the format [1][ID][2][VALUE][3] into a message.
-// The end delimiter (3) may be absent when the transport strips it.
-A3MicroMessage A3MicroMessage::parse(const uint8_t *buffer, size_t size) {
-  A3MicroMessage msg;
-
-  if (size > 0 && buffer[0] == 1) {
-    size_t i = 1;
-    // Extract the ID part (between 1 and 2 delimiters)
-    while (i < size && buffer[i] != 2) {
-      msg.id += (char)buffer[i++];
-    }
-
-    i++;  // Skip the delimiter (2)
-
-    // Extract the Value part (between 2 and 3 delimiters)
-    while (i < size && buffer[i] != 3) {
-      msg.value += (char)buffer[i++];
-    }
-  }
-
-  // Clean up the value string by standardizing it
-  msg.value.toLowerCase();     // Convert all characters to lowercase
-  msg.value.replace(" ", "");  // Remove any spaces
-
-  return msg;
-}
-
-#if defined(A3MICRO_HAS_BUILTIN_BLE)
-// UUIDs the A3Micro app uses to discover the board and exchange messages
-static const char *A3MICRO_SERVICE_UUID = "19B10000-E8F2-537E-4F6C-D104768A1214";
-static const char *A3MICRO_CHARACTERISTIC_UUID = "19B10001-E8F2-537E-4F6C-D104768A1214";
-#endif
-
-// HM-10 mode: communicates through the module's serial stream
-A3MicroManager::A3MicroManager(Stream &s)
-  : _s(&s), _frameLength(0), _inFrame(false)
-#if defined(A3MICRO_HAS_BUILTIN_BLE)
-    ,
-    _service(A3MICRO_SERVICE_UUID),
-    _characteristic(A3MICRO_CHARACTERISTIC_UUID, BLERead | BLEWrite | BLEWriteWithoutResponse | BLENotify, 100),
-    _rxHead(0), _rxTail(0)
-#endif
-{
-}
-
-#if defined(A3MICRO_HAS_BUILTIN_BLE)
-// Built-in BLE mode: communicates through the board's own radio
-A3MicroManager::A3MicroManager()
-  : _s(nullptr), _frameLength(0), _inFrame(false),
-    _service(A3MICRO_SERVICE_UUID),
-    _characteristic(A3MICRO_CHARACTERISTIC_UUID, BLERead | BLEWrite | BLEWriteWithoutResponse | BLENotify, 100),
-    _rxHead(0), _rxTail(0) {}
-
-A3MicroManager *A3MicroManager::_active = nullptr;
-
-// Called by ArduinoBLE (inside BLE.poll()) for every write from the app. The
-// characteristic only holds the latest value, so each write is queued here
-// before the next one can overwrite it.
-void A3MicroManager::onWritten(BLEDevice central, BLECharacteristic characteristic) {
-  (void)central;
-  if (_active) {
-    _active->queueRx(characteristic.value(), (size_t)characteristic.valueLength());
-  }
-}
-
-void A3MicroManager::queueRx(const uint8_t *data, size_t length) {
-  if (!data) {
-    return;
-  }
-  for (size_t i = 0; i < length; i++) {
-    pushRx(data[i]);
-  }
-  // Each write carries one whole frame. A write that starts a frame without
-  // ending it is still taken as a complete frame, as in earlier versions.
-  if (length > 0 && data[0] == 1 && memchr(data, 3, length) == nullptr) {
-    pushRx(3);
-  }
-}
-
-void A3MicroManager::pushRx(uint8_t b) {
-  size_t next = (_rxHead + 1) % RX_BUFFER_SIZE;
-  if (next == _rxTail) {
-    return;  // Full: the sketch isn't calling read(); drop the newest bytes
-  }
-  _rx[_rxHead] = b;
-  _rxHead = next;
-}
-#endif
-
-bool A3MicroManager::feed(uint8_t b, A3MicroMessage &msg) {
-  if (b == 1) {
-    // Start delimiter: begin a fresh frame, discarding any partial one
-    _frameLength = 0;
-    _frame[_frameLength++] = b;
-    _inFrame = true;
-    return false;
-  }
-
-  if (!_inFrame) {
-    return false;  // Not inside a frame: ignore noise and module status text
-  }
-
-  if (b == 3) {
-    // End delimiter: frame complete
-    _inFrame = false;
-    msg = A3MicroMessage::parse(_frame, _frameLength);
-    _frameLength = 0;
-    return true;
-  }
-
-  if (_frameLength >= FRAME_BUFFER_SIZE) {
-    // Oversized frame with no terminator: drop it and wait for the next start
-    _inFrame = false;
-    _frameLength = 0;
-    return false;
-  }
-
-  _frame[_frameLength++] = b;
-  return false;
-}
-
-// Starts BLE advertising under the given name. In HM-10 mode the module
-// advertises on its own, so there is nothing to do and this returns true.
-bool A3MicroManager::begin(const char *deviceName) {
-  if (_s) {
-    (void)deviceName;  // Unused in HM-10 mode: the module keeps its own name
-    return true;       // HM-10 handles advertising itself
-  }
-
-#if defined(A3MICRO_HAS_BUILTIN_BLE)
-  if (!BLE.begin()) {
-    return false;
-  }
-
-  BLE.setLocalName(deviceName);
-  BLE.setDeviceName(deviceName);
-  BLE.setAdvertisedService(_service);
-  _active = this;
-  _characteristic.setEventHandler(BLEWritten, onWritten);
-  _service.addCharacteristic(_characteristic);
-  BLE.addService(_service);
-  BLE.advertise();
-#endif
-
+bool A3MicroPacket::add(const String &label, const String &value) {
+  if (_count >= A3MICRO_MAX_PAIRS || label.length() == 0) return false;
+  _label[_count] = label;
+  _value[_count] = value;
+  _count++;
   return true;
 }
+bool A3MicroPacket::add(const String &label, const char *value) { return add(label, String(value)); }
+bool A3MicroPacket::add(const String &label, long value) { return add(label, String(value)); }
+bool A3MicroPacket::add(const String &label, int value) { return add(label, String(value)); }
+bool A3MicroPacket::add(const String &label, unsigned long value) { return add(label, String(value)); }
+bool A3MicroPacket::add(const String &label, double value, unsigned char decimals) { return add(label, String(value, decimals)); }
+bool A3MicroPacket::add(const String &label, bool value) { return add(label, String(value ? "1" : "0")); }
 
-// Reports whether the A3Micro app is connected. In HM-10 mode the module
-// doesn't expose connection state, so this always returns true.
-bool A3MicroManager::isConnected() {
-  if (_s) {
-    return true;
+void A3MicroPacket::clear() {
+  for (uint8_t i = 0; i < _count; i++) { _label[i] = ""; _value[i] = ""; }
+  _count = 0;
+}
+
+uint8_t A3MicroPacket::size() const { return _count; }
+bool A3MicroPacket::empty() const { return _count == 0; }
+
+const String &A3MicroPacket::label(uint8_t i) const {
+  static const String none;
+  return i < _count ? _label[i] : none;
+}
+const String &A3MicroPacket::value(uint8_t i) const {
+  static const String none;
+  return i < _count ? _value[i] : none;
+}
+
+int A3MicroPacket::indexOf(const char *label) const {
+  for (int i = (int)_count - 1; i >= 0; i--) {   // newest first: the last value for a label wins
+    if (_label[i] == label) return i;
   }
+  return -1;
+}
 
-#if defined(A3MICRO_HAS_BUILTIN_BLE)
-  BLEDevice central = BLE.central();  // also services BLE events
-  return central && central.connected();
+bool A3MicroPacket::has(const char *label) const { return indexOf(label) >= 0; }
+
+String A3MicroPacket::get(const char *label, const String &fallback) const {
+  int i = indexOf(label);
+  return i >= 0 ? _value[i] : fallback;
+}
+
+long A3MicroPacket::getInt(const char *label, long fallback) const {
+  int i = indexOf(label);
+  if (i < 0 || _value[i].length() == 0) return fallback;
+  return _value[i].toInt();
+}
+
+float A3MicroPacket::getFloat(const char *label, float fallback) const {
+  int i = indexOf(label);
+  if (i < 0 || _value[i].length() == 0) return fallback;
+  return _value[i].toFloat();
+}
+
+bool A3MicroPacket::getBool(const char *label, bool fallback) const {
+  int i = indexOf(label);
+  if (i < 0) return fallback;
+  String v = _value[i];
+  v.toLowerCase();
+  if (v == "1" || v == "on" || v == "true" || v == "yes" || v == "high") return true;
+  if (v == "0" || v == "off" || v == "false" || v == "no" || v == "low") return false;
+  return fallback;
+}
+
+String A3MicroPacket::toMessage() const {
+  String m = "##;";
+  for (uint8_t i = 0; i < _count; i++) {
+    if (i) m += ',';
+    m += escape(_label[i]);
+    m += ':';
+    m += escape(_value[i]);
+  }
+  m += ";##";
+  return m;
+}
+
+// Splits "label:value,label:value" into pairs; pairs without a label are skipped
+bool A3MicroPacket::parseBody(const char *body, size_t length) {
+  clear();
+  size_t start = 0;
+  while (start <= length) {
+    size_t end = start;
+    while (end < length && body[end] != ',') end++;
+    // one pair: body[start, end)
+    size_t colon = start;
+    while (colon < end && body[colon] != ':') colon++;
+    String label = unescape(body + start, colon - start);
+    String value = colon < end ? unescape(body + colon + 1, end - colon - 1) : String();
+    label.trim();
+    value.trim();
+    if (label.length() > 0 && _count < A3MICRO_MAX_PAIRS) {
+      _label[_count] = label;
+      _value[_count] = value;
+      _count++;
+    }
+    start = end + 1;
+  }
+  return _count > 0;
+}
+
+String A3MicroPacket::escape(const String &text) {
+  String out;
+  out.reserve(text.length());
+  for (unsigned int i = 0; i < text.length(); i++) {
+    char c = text[i];
+    switch (c) {
+      case ';': out += "%3B"; break;
+      case ':': out += "%3A"; break;
+      case ',': out += "%2C"; break;
+      case '#': out += "%23"; break;
+      case '%': out += "%25"; break;
+      default: out += c;
+    }
+  }
+  return out;
+}
+
+static int hexDigit(char c) {
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  return -1;
+}
+
+String A3MicroPacket::unescape(const char *text, size_t length) {
+  String out;
+  out.reserve(length);
+  for (size_t i = 0; i < length; i++) {
+    if (text[i] == '%' && i + 2 < length) {
+      int hi = hexDigit(text[i + 1]), lo = hexDigit(text[i + 2]);
+      if (hi >= 0 && lo >= 0) {
+        out += (char)(hi * 16 + lo);
+        i += 2;
+        continue;
+      }
+    }
+    out += text[i];
+  }
+  return out;
+}
+
+/* ---------------------------------------------------------------------------------------------------------------
+ * A3Micro: the link
+ * ------------------------------------------------------------------------------------------------------------- */
+
+A3Micro::A3Micro(Stream &serial)
+  : _serial(&serial), _length(0), _inside(false)
+#if defined(A3MICRO_BUILTIN_BLE)
+  , _service(A3MICRO_SERVICE_UUID),
+    _characteristic(A3MICRO_CHAR_UUID, BLERead | BLEWrite | BLEWriteWithoutResponse | BLENotify, 200),
+    _qHead(0), _qTail(0)
+#endif
+{
+  _tail[0] = _tail[1] = _tail[2] = 0;
+}
+
+#if defined(A3MICRO_BUILTIN_BLE)
+A3Micro *A3Micro::_self = nullptr;
+
+A3Micro::A3Micro()
+  : _serial(nullptr), _length(0), _inside(false),
+    _service(A3MICRO_SERVICE_UUID),
+    _characteristic(A3MICRO_CHAR_UUID, BLERead | BLEWrite | BLEWriteWithoutResponse | BLENotify, 200),
+    _qHead(0), _qTail(0) {
+  _tail[0] = _tail[1] = _tail[2] = 0;
+}
+
+// ArduinoBLE calls this (from BLE.poll()) for each write by the app. The characteristic keeps only the newest
+// value, so every write is copied into the queue straight away.
+void A3Micro::written(BLEDevice central, BLECharacteristic characteristic) {
+  (void)central;
+  if (_self) _self->enqueue(characteristic.value(), (size_t)characteristic.valueLength());
+}
+
+void A3Micro::enqueue(const uint8_t *data, size_t length) {
+  if (!data) return;
+  for (size_t i = 0; i < length; i++) {
+    size_t next = (_qHead + 1) % QUEUE_SIZE;
+    if (next == _qTail) return;               // full: receive() isn't being called often enough
+    _queue[_qHead] = (char)data[i];
+    _qHead = next;
+  }
+}
+#endif
+
+bool A3Micro::begin(const char *name) {
+  if (_serial) { (void)name; return true; }   // a serial module advertises by itself, under its own name
+#if defined(A3MICRO_BUILTIN_BLE)
+  if (!BLE.begin()) return false;
+  BLE.setLocalName(name);
+  BLE.setDeviceName(name);
+  BLE.setAdvertisedService(_service);
+  _service.addCharacteristic(_characteristic);
+  BLE.addService(_service);
+  _self = this;
+  _characteristic.setEventHandler(BLEWritten, written);
+  return BLE.advertise();
 #else
   return false;
 #endif
 }
 
-// Reads a message from the app, parsing ID and value.
-// Returns an empty message when no complete frame has arrived yet.
-// Returns one message per call; any further messages already received wait
-// for the next call, so none are lost.
-A3MicroMessage A3MicroManager::read() {
-  A3MicroMessage msg;
+bool A3Micro::connected() {
+  if (_serial) return true;
+#if defined(A3MICRO_BUILTIN_BLE)
+  BLEDevice app = BLE.central();
+  return app && app.connected();
+#else
+  return false;
+#endif
+}
 
-  if (_s) {
-    // HM-10 mode: consume only the bytes already waiting, one at a time, and
-    // assemble frames across calls. This never blocks, tolerates frames split
-    // across BLE packets, and resynchronises immediately after a dropped byte
-    // or a stray module status string such as "OK+CONN". Bytes after a
-    // complete frame stay in the serial buffer for the next call.
-    while (_s->available() > 0) {
-      if (feed((uint8_t)_s->read(), msg)) {
-        return msg;
-      }
+// Feeds one character into the message being assembled. True when it completes a message with pairs in it.
+bool A3Micro::take(char c, A3MicroPacket &packet) {
+  if (!_inside) {
+    _tail[0] = _tail[1]; _tail[1] = _tail[2]; _tail[2] = c;
+    if (_tail[0] == '#' && _tail[1] == '#' && _tail[2] == ';') {   // ##; : a message starts
+      _inside = true;
+      _length = 0;
+      _tail[0] = _tail[1] = _tail[2] = 0;
     }
-    return A3MicroMessage();  // No complete frame yet
+    return false;
   }
+  if (_length >= A3MICRO_MAX_MESSAGE) {                            // too long: drop it, look for the next start
+    _inside = false;
+    _length = 0;
+    return false;
+  }
+  _body[_length++] = c;
+  if (_length >= 3 && _body[_length - 3] == ';' && _body[_length - 2] == '#' && _body[_length - 1] == '#') {   // ;## : the end
+    _inside = false;
+    size_t bodyLength = _length - 3;
+    _body[bodyLength] = 0;
+    _length = 0;
+    return packet.parseBody(_body, bodyLength);
+  }
+  if (_length >= 3 && _body[_length - 3] == '#' && _body[_length - 2] == '#' && _body[_length - 1] == ';') {   // a new start: the last message never ended
+    _length = 0;
+  }
+  return false;
+}
 
-#if defined(A3MICRO_HAS_BUILTIN_BLE)
-  // Service the BLE stack so incoming writes and connection events are
-  // processed even if the sketch never calls isConnected(). Every write is
-  // queued by onWritten().
+bool A3Micro::receive(A3MicroPacket &packet) {
+  if (_serial) {
+    while (_serial->available() > 0) {
+      if (take((char)_serial->read(), packet)) return true;   // the rest waits in the serial buffer
+    }
+    return false;
+  }
+#if defined(A3MICRO_BUILTIN_BLE)
   BLE.poll();
-  while (_rxTail != _rxHead) {
-    uint8_t b = _rx[_rxTail];
-    _rxTail = (_rxTail + 1) % RX_BUFFER_SIZE;
-    if (feed(b, msg)) {
-      return msg;
-    }
+  while (_qTail != _qHead) {
+    char c = _queue[_qTail];
+    _qTail = (_qTail + 1) % QUEUE_SIZE;
+    if (take(c, packet)) return true;
   }
 #endif
-
-  return A3MicroMessage();
+  return false;
 }
 
-// Writes a message to the app using the protocol [1][ID][2][VALUE][3]
-void A3MicroManager::write(const String &id, const String &value) {
-  if (_s) {
-    _s->write((uint8_t)1);
-    _s->print(id);
-    _s->write((uint8_t)2);
-    _s->print(value);
-    _s->write((uint8_t)3);
-    return;
+void A3Micro::sendText(const String &message) {
+  if (_serial) { _serial->print(message); return; }
+#if defined(A3MICRO_BUILTIN_BLE)
+  BLE.poll();
+  // In pieces of 20 bytes: what fits in one notification on every phone; the app joins them up again
+  const char *p = message.c_str();
+  size_t left = message.length();
+  while (left > 0) {
+    size_t n = left < 20 ? left : 20;
+    _characteristic.writeValue((const uint8_t *)p, n);
+    p += n;
+    left -= n;
   }
-
-#if defined(A3MICRO_HAS_BUILTIN_BLE)
-  BLE.poll();  // Keep the BLE stack serviced in write-only sketches
-  String frame;
-  frame += (char)1;
-  frame += id;
-  frame += (char)2;
-  frame += value;
-  frame += (char)3;
-  _characteristic.writeValue((const uint8_t *)frame.c_str(), frame.length());
 #endif
 }
+
+void A3Micro::send(const A3MicroPacket &packet) {
+  if (!packet.empty()) sendText(packet.toMessage());
+}
+void A3Micro::send(const String &label, const String &value) {
+  A3MicroPacket p;
+  p.add(label, value);
+  send(p);
+}
+void A3Micro::send(const String &label, const char *value) { send(label, String(value)); }
+void A3Micro::send(const String &label, long value) { send(label, String(value)); }
+void A3Micro::send(const String &label, int value) { send(label, String(value)); }
+void A3Micro::send(const String &label, double value, unsigned char decimals) { send(label, String(value, decimals)); }

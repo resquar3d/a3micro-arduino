@@ -1,78 +1,43 @@
 /*
- * UNO_R4_WIFI_WRITE_BUTTON.ino
+ * UNO_R4_WIFI_WRITE_BUTTON.ino - a push button on the board shows in the app
  *
- * Description:
- * Demonstrates sending BLE messages to A3Micro from a physical button on the
- * Arduino UNO R4 WiFi using its built-in BLE radio via `A3MicroManager` (no
- * HM-10 module needed). When the button is pressed, the sketch sends value
- * `Pressed`; when released, it sends value `Released`.
+ * Sends ##;btn:1;## while the button is held and ##;btn:0;## when it is let go. Add a display with
+ * label btn in the app to see it.
+ * Button between pin 2 and GND (the internal pull-up is used).
  *
- * Wiring:
- * - Button between pin 2 and GND (uses INPUT_PULLUP)
+ * Board: UNO R4 WiFi, using its own Bluetooth LE radio.
  *
- * Developed for TwinSparks Development (www.twinsparksdevelopment.com)
- * Modified and written by R.E Espino of twinsparks.dev
- * Licensed under the MIT License. See LICENSE for details.
+ * Copyright (c) 2026 R.E Espino, TwinSparks Development (www.twinsparksdevelopment.com)
+ * Released under the MIT License (see LICENSE).
  */
 
-#include "A3Micro.h"
+#include <A3Micro.h>
 
-// Create an instance of the A3MicroManager for the built-in BLE radio
-// (no constructor argument = use the board's own radio instead of an HM-10)
-A3MicroManager manager;
+A3Micro a3;                       // the UNO R4 WiFi's own Bluetooth LE radio
 
-// Button input pin and message ID for A3Micro button widget
 const int BUTTON_PIN = 2;
-const char* BUTTON_ID = "b0";
+const unsigned long SETTLE_MS = 25;            // contacts bounce: a change must last this long to count
 
-// Debounce state:
-// Buttons can "bounce" electrically when pressed/released, causing noisy rapid toggles.
-// These variables filter that noise so each physical action sends only one BLE message.
-int lastButtonReading = HIGH;
-int buttonState = HIGH;
-unsigned long lastDebounceTime = 0;
-const unsigned long DEBOUNCE_DELAY_MS = 25;
+int stableState = HIGH, lastReading = HIGH;
+unsigned long changedAt = 0;
 
 void setup() {
-  Serial.begin(9600);  // Initialize USB serial communication
-
-  // Initialize built-in BLE and start advertising as "UNO R4 WIFI"
-  if (!manager.begin("UNO R4 WIFI")) {
-    Serial.println("Starting Bluetooth® Low Energy failed!");
-  }
-  Serial.println("BLE Button Peripheral, waiting for connections....");
-
-  pinMode(BUTTON_PIN, INPUT_PULLUP);  // Use internal pull-up; pressed state reads LOW
+  Serial.begin(9600);
+  if (!a3.begin("UNO R4 WiFi")) Serial.println("Bluetooth LE did not start");
+  Serial.println("Waiting for the A3Micro Control app...");
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
 }
 
 void loop() {
-  // Only send messages while the A3Micro app is connected
-  if (!manager.isConnected()) {
-    return;
-  }
-
-  // Read current button state from the input pin
   int reading = digitalRead(BUTTON_PIN);
-
-  // If raw input changed, restart debounce timer.
-  if (reading != lastButtonReading) {
-    lastDebounceTime = millis();
+  if (reading != lastReading) {
+    lastReading = reading;
+    changedAt = millis();
   }
-
-  // Accept the new state only if it stays unchanged for the debounce window.
-  if ((millis() - lastDebounceTime) > DEBOUNCE_DELAY_MS) {
-    if (reading != buttonState) {
-      buttonState = reading;  // Update stable button state after debounce
-      if (buttonState == LOW) {
-        manager.write(BUTTON_ID, "Pressed");  // Send pressed value
-        Serial.println("Button pressed");     // Debug output
-      } else {
-        manager.write(BUTTON_ID, "Released");  // Send released value
-        Serial.println("Button released");     // Debug output
-      }
-    }
+  if (reading != stableState && millis() - changedAt >= SETTLE_MS) {
+    stableState = reading;
+    bool pressed = stableState == LOW;
+    a3.send("btn", pressed ? 1 : 0);
+    Serial.println(pressed ? "pressed" : "released");
   }
-
-  // Save raw reading for the next debounce comparison
-  lastButtonReading = reading;
 }

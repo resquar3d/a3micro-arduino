@@ -1,49 +1,34 @@
 /*
- * UNO_R4_MINIMA_LED.ino
+ * UNO_R4_MINIMA_LED.ino - a button in the app switches an LED
  *
- * Description:
- * Arduino sketch that utilizes the `A3MicroManager` class to receive and interpret BLE messages
- * for device control, such as turning an LED on or off based on message data. Initializes BLE and
- * serial communication for message handling.
+ * In the app, a button or switch with label b0 sends ##;b0:1;## when pressed / on and ##;b0:0;## when
+ * released / off. This sketch turns the LED on pin 13 on and off with it.
  *
- * Developed for TwinSparks Development (www.twinsparksdevelopment.com)
- * Modified and written by R.E Espino of twinsparks.dev
- * Licensed under the MIT License. See LICENSE for details.
+ * Board: UNO R4 Minima with an HM-10 on Serial1 (D0 / D1).
+ *
+ * Copyright (c) 2026 R.E Espino, TwinSparks Development (www.twinsparksdevelopment.com)
+ * Released under the MIT License (see LICENSE).
  */
 
-#include "A3Micro.h"
+#include <A3Micro.h>
 
-// Create an instance of the A3MicroManager for managing messages
-A3MicroManager manager(Serial1);
+A3Micro a3(Serial1);              // HM-10 on the UNO R4 Minima's hardware serial: TXD -> D0, RXD -> D1
 
-// LED pin for onboard LED
-const int LED = 13;
+const int LED_PIN = 13;
 
 void setup() {
-  Serial.begin(9600);    // Initialize USB serial communication
-  Serial1.begin(9600);   // Initialize hardware serial for BLE communication
-  manager.begin();       // Initialize A3Micro messaging
-  pinMode(LED, OUTPUT);  // Set the LED pin as an output
+  Serial.begin(9600);
+  Serial1.begin(9600);
+  a3.begin();
+  pinMode(LED_PIN, OUTPUT);
 }
 
 void loop() {
-  // Only handle messages while the A3Micro app is connected
-  if (manager.isConnected()) {
-    // Read a message from BLE
-    A3MicroMessage msg = manager.read();
+  A3MicroPacket in;
+  if (!a3.receive(in)) return;                 // nothing new yet
 
-    // Print message details if both ID and Value are valid
-    if (msg.hasId() && msg.hasValue()) {
-      Serial.println(msg.toString());
-    }
-
-    // Control LED based on message content
-    if (msg.id == "b0") {
-      if (msg.value == "1") {
-        digitalWrite(LED, HIGH);  // Turn LED on
-      } else if (msg.value == "0") {
-        digitalWrite(LED, LOW);  // Turn LED off
-      }
-    }
+  Serial.println(in.toMessage());              // everything that arrived, for the Serial Monitor
+  if (in.has("b0")) {
+    digitalWrite(LED_PIN, in.getBool("b0") ? HIGH : LOW);
   }
 }

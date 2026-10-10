@@ -1,101 +1,152 @@
 /*
- * A3Micro.h
+ * A3Micro.h - talk to the A3Micro Control app from an Arduino-compatible board
  *
- * Description:
- * Header file defining classes for BLE (Bluetooth Low Energy) message handling on Arduino.
- * It includes the `A3MicroMessage` class for representing messages and the `A3MicroManager`
- * class for managing communication with the A3Micro app. The manager supports two transports
- * behind one API: an HM-10 BLE module wired to a serial stream (any board), or the board's
- * built-in BLE radio via ArduinoBLE (UNO R4 WiFi).
+ * Copyright (c) 2026 R.E Espino, TwinSparks Development (www.twinsparksdevelopment.com)
+ * Released under the MIT License (see LICENSE).
  *
- * Developed for TwinSparks Development (www.twinsparksdevelopment.com)
- * Modified and written by R.E Espino of twinsparks.dev
- * Licensed under the MIT License. See LICENSE for details.
+ * THE A3MICRO PROTOCOL
+ * Every message, in both directions, is one line of text:
+ *
+ *     ##;label1:value1,label2:value2,...,labelN:valueN;##
+ *
+ *   ##      start of a message
+ *   ;       ends the start marker and starts the end marker
+ *   :       between a label and its value
+ *   ,       between two label:value pairs
+ *   ##      end of a message
+ *
+ * A label names one input or reading, e.g. j1x (joystick 1, x direction), sl0 (slider 0), bat (battery).
+ * The app sends one message per action (a button press, a moved slider or joystick, a Send);
+ * the board answers in the same format (battery voltage, a measured distance, ...).
+ * A ; : , # or % inside a label or value is sent as %3B %3A %2C %23 %25, so it can't break a message.
+ *
+ * HOW THE BOARD CONNECTS
+ *   A3Micro a3(Serial1);   an HM-10 (or any serial BLE module) wired to a serial port: any board
+ *   A3Micro a3;            the board's own Bluetooth LE radio (UNO R4 WiFi)
+ * Both work the same way:
+ *
+ *   A3MicroPacket in;
+ *   if (a3.receive(in)) {
+ *     long x = in.getInt("j1x"), y = in.getInt("j1y");
+ *   }
+ *   a3.send("bat", 3.71);              // one reading:      ##;bat:3.71;##
+ *   A3MicroPacket out;                 // several at once:  ##;bat:3.71,dist:42;##
+ *   out.add("bat", 3.71); out.add("dist", 42); a3.send(out);
  */
 
 #ifndef A3MICRO_H
 #define A3MICRO_H
 
-#include "Arduino.h"
+#include <Arduino.h>
 
-// Built-in BLE support is compiled in only for boards that have a BLE radio.
-// The board macro (not __has_include) is required here so the Arduino build
-// system detects the ArduinoBLE dependency and adds it to the include path.
+// The board's own BLE radio is used where the board has one. (The board macro, not __has_include, so the
+// Arduino IDE sees the ArduinoBLE dependency.)
 #if defined(ARDUINO_UNOWIFIR4)
-#define A3MICRO_HAS_BUILTIN_BLE
+#define A3MICRO_BUILTIN_BLE 1
 #include <ArduinoBLE.h>
 #endif
 
-// Represents a message with an ID and a value received from BLE.
-class A3MicroMessage {
+#ifndef A3MICRO_MAX_PAIRS
+#define A3MICRO_MAX_PAIRS 8      // label:value pairs one message can carry
+#endif
+#ifndef A3MICRO_MAX_MESSAGE
+#define A3MICRO_MAX_MESSAGE 160  // longest message accepted, in characters (between the markers)
+#endif
+
+// The A3Micro BLE service and its one characteristic (write from the app, notify back to it)
+#define A3MICRO_SERVICE_UUID "A3C10000-9A58-4589-AD8F-6FCC3C2BF21A"
+#define A3MICRO_CHAR_UUID    "A3C10001-9A58-4589-AD8F-6FCC3C2BF21A"
+
+// One message: a list of label:value pairs
+class A3MicroPacket {
 public:
-  String id;     // Message ID, typically a command identifier
-  String value;  // Message value, e.g., "1" or "0" for LED control
+  A3MicroPacket();
 
-  A3MicroMessage();       // Constructor
-  bool hasId() const;       // Checks if the ID is valid (non-empty)
-  bool hasValue() const;    // Checks if the value is valid (non-empty)
-  String toString() const;  // Returns a string representation of the message
+  // Adds a pair (false when the packet is full). Numbers are written as text; floats with `decimals` digits.
+  bool add(const String &label, const String &value);
+  bool add(const String &label, const char *value);
+  bool add(const String &label, long value);
+  bool add(const String &label, int value);
+  bool add(const String &label, unsigned long value);
+  bool add(const String &label, double value, unsigned char decimals = 2);
+  bool add(const String &label, bool value);
+  void clear();
 
-  // Parses a raw [1][ID][2][VALUE][3] frame into a message
-  static A3MicroMessage parse(const uint8_t *buffer, size_t size);
+  uint8_t size() const;
+  bool empty() const;
+  const String &label(uint8_t i) const;
+  const String &value(uint8_t i) const;
+
+  // Looking up a label (the last one wins when a label appears twice)
+  bool has(const char *label) const;
+  String get(const char *label, const String &fallback = "") const;
+  long getInt(const char *label, long fallback = 0) const;
+  float getFloat(const char *label, float fallback = 0) const;
+  bool getBool(const char *label, bool fallback = false) const;   // 1 / on / true / yes = true
+
+  // The whole message as sent: ##;label:value,...;##
+  String toMessage() const;
+  // Fills the packet from what is between ##; and ;## (false when it holds no valid pair)
+  bool parseBody(const char *body, size_t length);
+
+  // ; : , # % as %3B %3A %2C %23 %25, and back
+  static String escape(const String &text);
+  static String unescape(const char *text, size_t length);
+
+private:
+  String _label[A3MICRO_MAX_PAIRS];
+  String _value[A3MICRO_MAX_PAIRS];
+  uint8_t _count;
+  int indexOf(const char *label) const;
 };
 
-// Manages BLE message reading and writing. One class, two transports:
-//   A3MicroManager manager(SSerial);  // HM-10 module on a serial stream
-//   A3MicroManager manager;           // built-in BLE radio (UNO R4 WiFi only)
-// Sketches use the same begin()/isConnected()/read()/write() calls either way.
-class A3MicroManager {
-private:
-  Stream *_s;  // Serial stream to the HM-10, or nullptr in built-in BLE mode
-
-  // Frame assembly. Bytes are accumulated across read() calls so the loop
-  // never blocks waiting for the rest of a frame.
-  static const size_t FRAME_BUFFER_SIZE = 100;
-  uint8_t _frame[FRAME_BUFFER_SIZE];  // Bytes of the frame currently being received
-  size_t _frameLength;                // How many bytes of _frame are filled
-  bool _inFrame;                      // True once a start delimiter (1) has been seen
-
-  // Adds one received byte to the frame being assembled. Returns true, with the
-  // parsed message in msg, when the byte completes a frame.
-  bool feed(uint8_t b, A3MicroMessage &msg);
-
-#if defined(A3MICRO_HAS_BUILTIN_BLE)
-  BLEService _service;                // BLE service advertised to the A3Micro app
-  BLECharacteristic _characteristic;  // Characteristic carrying A3Micro messages
-
-  // Built-in BLE mode: the bytes of every write, queued as they arrive so no
-  // message is lost when several arrive between read() calls.
-  static const size_t RX_BUFFER_SIZE = 256;
-  uint8_t _rx[RX_BUFFER_SIZE];  // Ring buffer
-  size_t _rxHead;               // Next position to write
-  size_t _rxTail;               // Next position to read
-  void queueRx(const uint8_t *data, size_t length);
-  void pushRx(uint8_t b);
-
-  static A3MicroManager *_active;  // Manager that receives the write events
-  static void onWritten(BLEDevice central, BLECharacteristic characteristic);
-#endif
-
+// The link to the app: receives and sends A3Micro messages
+class A3Micro {
 public:
-  explicit A3MicroManager(Stream &s);  // HM-10 mode: takes the module's serial stream
-
-#if defined(A3MICRO_HAS_BUILTIN_BLE)
-  A3MicroManager();  // Built-in BLE mode: uses the board's own radio
+  explicit A3Micro(Stream &serial);   // a serial BLE module (HM-10 and similar)
+#if defined(A3MICRO_BUILTIN_BLE)
+  A3Micro();                          // the board's own BLE radio
 #endif
 
-  // Starts BLE advertising under the given name (built-in BLE mode).
-  // In HM-10 mode the module advertises on its own, so this is a no-op returning true.
-  bool begin(const char *deviceName = "A3Micro");
+  // Starts advertising as `name` (own radio). A serial module advertises by itself: always true.
+  bool begin(const char *name = "A3Micro");
 
-  // True while the A3Micro app is connected (built-in BLE mode).
-  // In HM-10 mode the connection state isn't visible, so this always returns true.
-  bool isConnected();
+  // True while the app is connected (own radio). A serial module can't tell: always true.
+  bool connected();
 
-  // Reads and parses a message from the app. Never blocks: returns an empty
-  // message when no complete frame has arrived yet.
-  A3MicroMessage read();
-  void write(const String &id, const String &value);  // Writes a message to the app
+  // True, with the message in `packet`, when a complete message has arrived. Never waits:
+  // false when nothing (or only part of a message) has arrived yet. One message per call.
+  bool receive(A3MicroPacket &packet);
+
+  void send(const A3MicroPacket &packet);
+  void send(const String &label, const String &value);
+  void send(const String &label, const char *value);
+  void send(const String &label, long value);
+  void send(const String &label, int value);
+  void send(const String &label, double value, unsigned char decimals = 2);
+
+private:
+  Stream *_serial;   // nullptr when the board's own radio is used
+
+  // Message assembly, one character at a time (messages may arrive in pieces)
+  char _body[A3MICRO_MAX_MESSAGE + 1];
+  size_t _length;
+  bool _inside;      // between ##; and ;##
+  char _tail[3];     // the last three characters seen outside a message (to spot ##;)
+  bool take(char c, A3MicroPacket &packet);
+  void sendText(const String &message);
+
+#if defined(A3MICRO_BUILTIN_BLE)
+  BLEService _service;
+  BLECharacteristic _characteristic;
+  // What the app wrote, kept in order until receive() reads it
+  static const size_t QUEUE_SIZE = 512;
+  char _queue[QUEUE_SIZE];
+  size_t _qHead, _qTail;   // queue: next write / next read
+  void enqueue(const uint8_t *data, size_t length);
+  static A3Micro *_self;
+  static void written(BLEDevice central, BLECharacteristic characteristic);
+#endif
 };
 
 #endif

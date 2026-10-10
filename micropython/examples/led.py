@@ -1,44 +1,31 @@
 """
-led.py
+led.py - a button in the A3Micro Control app switches the board's LED (own Bluetooth radio)
 
-Description:
-MicroPython version of the UNO_R4_WIFI_LED example. Receives messages from the
-A3Micro app over the board's built-in BLE radio and toggles the onboard LED:
-message b0 with value 1 turns it on, value 0 turns it off.
+The app's button or switch with label b0 sends ##;b0:1;## (on) and ##;b0:0;## (off).
+Boards: ESP32, Raspberry Pi Pico W / Pico 2 W and other MicroPython boards with Bluetooth.
+Copy a3micro.py and this file to the board (save this one as main.py to start it at power-on).
 
-Copy a3micro.py and this file to the board (save this one as main.py to run it
-at power-on).
-
-Developed for TwinSparks Development (www.twinsparksdevelopment.com)
-Modified and written by R.E Espino of twinsparks.dev
-Licensed under the MIT License. See LICENSE for details.
+Copyright (c) 2026 R.E Espino, TwinSparks Development (www.twinsparksdevelopment.com)
+Released under the MIT License (see LICENSE).
 """
 
 import time
 from machine import Pin
-from a3micro import A3MicroManager
+from a3micro import A3Micro
 
 try:
-    led = Pin("LED", Pin.OUT)  # Raspberry Pi Pico W / Pico 2 W
+    led = Pin("LED", Pin.OUT)      # Pico W / Pico 2 W
 except (TypeError, ValueError):
-    led = Pin(2, Pin.OUT)      # Most ESP32 boards
+    led = Pin(2, Pin.OUT)          # most ESP32 boards
 
-manager = A3MicroManager()  # no argument = built-in BLE
-
-if not manager.begin("A3Micro"):
-    print("Starting BLE failed!")
+a3 = A3Micro()                     # the board's own Bluetooth LE radio
+if not a3.begin("A3Micro LED"):
+    print("Bluetooth LE did not start")
 
 while True:
-    # Only handle messages while the A3Micro app is connected
-    if manager.is_connected():
-        msg = manager.read()
-
-        if msg.has_id() and msg.has_value():
-            print(msg.to_string())
-
-        if msg.id == "b0":
-            if msg.value == "1":
-                led.value(1)
-            elif msg.value == "0":
-                led.value(0)
+    packet = a3.receive()
+    if packet:
+        print(packet.to_message())
+        if packet.has("b0"):
+            led.value(1 if packet.get_bool("b0") else 0)
     time.sleep_ms(5)

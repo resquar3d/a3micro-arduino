@@ -1,51 +1,36 @@
 /*
- * HM10_BLE_WRITE_REPEAT.ino
+ * HM10_BLE_WRITE_REPEAT.ino - the board reports to the app every second
  *
- * Description:
- * Demonstrates continuously sending BLE values using `A3MicroManager::write`.
- * The sketch alternates between sending `1` and `0` with a fixed delay.
+ * Sends a counter and the board's uptime together, once a second: ##;count:7,up:7.0;##
+ * Add displays with labels count and up in the app.
  *
- * Wiring:
- * - HM-10 TXD -> Arduino pin 7 (RX)
- * - HM-10 RXD -> Arduino pin 8 (TX)
+ * Board: UNO R3 (or any board) with an HM-10 on pins 7 / 8.
  *
- * Developed for TwinSparks Development (www.twinsparksdevelopment.com)
- * Modified and written by R.E Espino of twinsparks.dev
- * Licensed under the MIT License. See LICENSE for details.
+ * Copyright (c) 2026 R.E Espino, TwinSparks Development (www.twinsparksdevelopment.com)
+ * Released under the MIT License (see LICENSE).
  */
 
-#include "A3Micro.h"
+#include <A3Micro.h>
+#include <SoftwareSerial.h>
 
-// Define BLE communication pins and create software serial for BLE
-#include "SoftwareSerial.h"
-const int rXPin = 7;
-const int tXPin = 8;
-SoftwareSerial SSerial(rXPin, tXPin);
+SoftwareSerial bleSerial(7, 8);   // HM-10: TXD -> pin 7, RXD -> pin 8 (through a 5 V to 3.3 V divider)
+A3Micro a3(bleSerial);
 
-// Create an instance of the A3MicroManager for managing messages
-A3MicroManager manager(SSerial);
-
-// Message ID and repeat interval
-const char* REPEAT_ID = "b0";
-const unsigned long REPEAT_DELAY_MS = 1000;
+unsigned long lastSent = 0, count = 0;
 
 void setup() {
-  Serial.begin(9600);   // Initialize USB serial communication
-  SSerial.begin(9600);  // Initialize software serial for BLE communication
-  manager.begin();      // Initialize A3Micro messaging
+  Serial.begin(9600);
+  bleSerial.begin(9600);
+  a3.begin();
 }
 
 void loop() {
-  // Wait for the A3Micro app to connect
-  if (!manager.isConnected()) {
-    return;
-  }
+  if (millis() - lastSent < 1000) return;
+  lastSent = millis();
 
-  manager.write(REPEAT_ID, "1");  // Send value 1
-  Serial.println("Sent: b0=1");   // Debug output
-  delay(REPEAT_DELAY_MS);
-
-  manager.write(REPEAT_ID, "0");  // Send value 0
-  Serial.println("Sent: b0=0");   // Debug output
-  delay(REPEAT_DELAY_MS);
+  A3MicroPacket out;                           // two readings in one message
+  out.add("count", ++count);
+  out.add("up", millis() / 1000.0, 1);
+  a3.send(out);
+  Serial.println(out.toMessage());
 }

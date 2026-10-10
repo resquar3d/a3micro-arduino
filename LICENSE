@@ -1,7 +1,6 @@
 MIT License
 
-Copyright (c) 2026 R.E Espino, TwinSparks Development (twinsparks.dev)
-Copyright (c) 2026 A+ Mobile Solutions Inc
+Copyright (c) 2026 R.E Espino, TwinSparks Development (www.twinsparksdevelopment.com)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -20,14 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
---------------------------------------------------------------------------------
-
-Exception: examples/Rename_HM10_Bluetooth
-
-The sketch in examples/Rename_HM10_Bluetooth is NOT covered by the MIT License
-above. It was originally written by Arik Yavilevich and modified by Anurag
-Purwar, and is distributed under the GNU General Public License v3.0 (GPL-3.0).
-It is a standalone utility for configuring HM-10 modules and does not include or
-link against the A3Micro library. See the header of that sketch for details,
-and https://www.gnu.org/licenses/gpl-3.0.html for the license text.

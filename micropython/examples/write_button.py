@@ -1,39 +1,35 @@
 """
-write_button.py
+write_button.py - a push button on the board shows in the A3Micro Control app
 
-Description:
-MicroPython version of the UNO_R4_WIFI_WRITE_BUTTON example. Sends b0 = 1 when a
-button is pressed and b0 = 0 when it is released, so a Display control with the
-message ID b0 in the A3Micro app shows the button's state.
-
+Sends ##;btn:1;## while the button is held and ##;btn:0;## when it is let go, plus the board's uptime
+every two seconds (##;up:12;##). Give displays in the app the labels btn and up.
 Wiring: a push button between GPIO 15 and GND (the internal pull-up is used).
 
-Developed for TwinSparks Development (www.twinsparksdevelopment.com)
-Modified and written by R.E Espino of twinsparks.dev
-Licensed under the MIT License. See LICENSE for details.
+Copyright (c) 2026 R.E Espino, TwinSparks Development (www.twinsparksdevelopment.com)
+Released under the MIT License (see LICENSE).
 """
 
 import time
 from machine import Pin
-from a3micro import A3MicroManager
+from a3micro import A3Micro
 
-BUTTON_ID = "b0"
 button = Pin(15, Pin.IN, Pin.PULL_UP)
+a3 = A3Micro()
+if not a3.begin("A3Micro Button"):
+    print("Bluetooth LE did not start")
 
-manager = A3MicroManager()
-
-if not manager.begin("A3Micro"):
-    print("Starting BLE failed!")
-
-last_pressed = None
-
+last = None
+last_report = time.ticks_ms()
 while True:
-    # Only send messages while the A3Micro app is connected
-    if manager.is_connected():
+    if a3.connected():
         pressed = button.value() == 0
-        if pressed != last_pressed:
-            last_pressed = pressed
-            manager.write(BUTTON_ID, "1" if pressed else "0")
+        if pressed != last:
+            last = pressed
+            a3.send("btn", pressed)
+        if time.ticks_diff(time.ticks_ms(), last_report) >= 2000:
+            last_report = time.ticks_ms()
+            a3.send("up", time.ticks_ms() // 1000)
     else:
-        last_pressed = None  # Send the current state again after reconnecting
-    time.sleep_ms(20)  # Debounce
+        last = None                # send the button again after reconnecting
+    a3.receive()                   # keep incoming messages moving even when not used
+    time.sleep_ms(20)              # also smooths out contact bounce

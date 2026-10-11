@@ -103,15 +103,18 @@ jobs:
     name: Compile for ${{ matrix.name }}
     steps:
       - uses: actions/checkout@v5
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Install the esp32 boards
+        run: |
+          URL=https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index --additional-urls "$URL"
+          arduino-cli core install esp32:esp32 --additional-urls "$URL"
+      # Each compiler error also becomes an annotation, so it can be read without opening the log
       - name: Compile the HID bridge
-        uses: arduino/compile-sketches@v1
-        with:
-          fqbn: ${{ matrix.fqbn }}
-          platforms: |
-            - name: esp32:esp32
-              source-url: https://espressif.github.io/arduino-esp32/package_esp32_index.json
-          libraries: |
-            - source-path: ./
-          sketch-paths: |
-            - examples/ESP32_HID_BRIDGE
-          verbose: false
+        run: |
+          set +e
+          arduino-cli compile --fqbn "${{ matrix.fqbn }}" --library . examples/ESP32_HID_BRIDGE > build.log 2>&1
+          status=$?
+          cat build.log
+          grep -E "error|Error" build.log | head -15 | while IFS= read -r line; do echo "::error::$line"; done
+          exit $status

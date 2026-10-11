@@ -24,7 +24,9 @@ bool A3MicroPacket::add(const String &label, const char *value) { return add(lab
 bool A3MicroPacket::add(const String &label, long value) { return add(label, String(value)); }
 bool A3MicroPacket::add(const String &label, int value) { return add(label, String(value)); }
 bool A3MicroPacket::add(const String &label, unsigned long value) { return add(label, String(value)); }
-bool A3MicroPacket::add(const String &label, double value, unsigned char decimals) { return add(label, String(value, decimals)); }
+// (unsigned int): the ESP32 boards package has String(float, unsigned int) and String(double, unsigned int), so an
+// unsigned char there is ambiguous; AVR and UNO R4 take it as well
+bool A3MicroPacket::add(const String &label, double value, unsigned char decimals) { return add(label, String(value, (unsigned int)decimals)); }
 bool A3MicroPacket::add(const String &label, bool value) { return add(label, String(value ? "1" : "0")); }
 
 void A3MicroPacket::clear() {
@@ -303,4 +305,4 @@ void A3Micro::send(const String &label, const String &value) {
 void A3Micro::send(const String &label, const char *value) { send(label, String(value)); }
 void A3Micro::send(const String &label, long value) { send(label, String(value)); }
 void A3Micro::send(const String &label, int value) { send(label, String(value)); }
-void A3Micro::send(const String &label, double value, unsigned char decimals) { send(label, String(value, decimals)); }
+void A3Micro::send(const String &label, double value, unsigned char decimals) { send(label, String(value, (unsigned int)decimals)); }

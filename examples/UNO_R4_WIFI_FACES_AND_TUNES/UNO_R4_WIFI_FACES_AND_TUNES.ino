@@ -15,13 +15,21 @@
  *   voice commands (A3 Micro Pro) arrive as vc:<the words>: "happy face", "show love", "play music",
  *                                 "next song", "play birthday", "stop music", "go to sleep", "wake up",
  *                                 "robot talk", "beep beep", "space", "warp", "jump", "laser", "fire", "scan"
- * The board tells the app what it shows and plays: face:<name>, tune:<name> and tune:off when it ends.
+ * Your own recordings (MP3) on a DFPlayer Mini, the face talking while they play:
+ *   sound:<1-255>, sound:stop      a button "sound" / "1"; vol:<0-30> sets its volume
+ *   voice: "play my sound", "my voice", "play sound 2", "louder", "quieter"
+ *   On the microSD card (FAT32): a folder named mp3 with your files named 0001.mp3, 0002.mp3, ...
+ *   (0001.mp3 is sound 1). Without a DFPlayer the sketch still works: sound:<n> beeps instead.
+ * The board tells the app what it shows and plays: face:<name>, tune:<name> and tune:off when it ends,
+ * sound:<n> and sound:off.
  * With the app gone it falls asleep (sleepy face); when the app connects it wakes up happy.
  *
  * Board: UNO R4 WiFi, using its own Bluetooth LE radio (with an HM-10 on any board: A3Micro a3(Serial1);).
  * Wiring:  OLED  VCC 3.3V or 5V · GND · SCL to SCL · SDA to SDA   (I2C address 0x3C; see OLED_ADDRESS)
  *          buzzer  + to pin 2 (the UNO_R4_WIFI_HUD_DRIVE robot's horn pin, so the two sketches combine) · - to GND
- * Needs the U8g2 library (Library Manager: "U8g2" by oliver).
+ *          DFPlayer Mini  VCC 5V · GND · TX to pin 0 (RX) · RX to pin 1 (TX) through a 1 kOhm resistor ·
+ *                         SPK_1 and SPK_2 to a small speaker (3 W, 4-8 Ohm)
+ * Needs the U8g2 library (Library Manager: "U8g2" by oliver) and DFRobotDFPlayerMini ("DFPlayer Mini" by DFRobot).
  *
  * Copyright (c) 2026 R.E Espino, TwinSparks Development (www.twinsparksdevelopment.com)
  * Released under the MIT License (see LICENSE).
@@ -30,6 +38,7 @@
 #include <A3Micro.h>
 #include <U8g2lib.h>
 #include <Wire.h>
+#include <DFRobotDFPlayerMini.h>
 
 A3Micro a3;                                     // the UNO R4 WiFi's own Bluetooth LE radio
 U8G2_SH1106_128X64_NONAME_F_HW_I2C oled(U8G2_R0, U8X8_PIN_NONE);
@@ -45,6 +54,14 @@ unsigned long nextBlink = 0, blinkUntil = 0;
 
 const int CX = 64, CY = 32;                     // the middle of the screen
 bool tunePlaying();                             // (below, with the tunes)
+int tuneIndex(String name);
+
+// ---------- Your recordings: a DFPlayer Mini on Serial1 (pins 0 and 1) ----------
+DFRobotDFPlayerMini mp3;
+bool hasMp3 = false;                            // a DFPlayer answered at start-up
+int sound = 0;                                  // the recording playing (0: none)
+int mp3Volume = 22;                             // 0-30
+unsigned long soundSafety = 0;                  // gives up waiting for "finished" after this time
 
 void eyesOpen(int r = 4) {
   oled.drawFilledEllipse(CX - 11, CY - 8, r - 1, r + 1);
@@ -73,7 +90,11 @@ void drawFace(bool blink) {
   oled.drawCircle(CX, CY, 30);                  // the head
   oled.drawCircle(CX, CY, 29);
   const char *name = FACES[face];
-  if (!strcmp(name, "happy"))      { blink ? eyesClosed() : eyesOpen(); smile(); }
+  if (sound) {                                  // a recording playing: the face talks
+    eyesOpen();
+    oled.drawFilledEllipse(CX, CY + 12, 8, 1 + (millis() / 130) % 3 * 3);
+  }
+  else if (!strcmp(name, "happy"))      { blink ? eyesClosed() : eyesOpen(); smile(); }
   else if (!strcmp(name, "sad"))   { blink ? eyesClosed() : eyesOpen(); frown();
                                      oled.drawLine(CX - 17, CY - 13, CX - 7, CY - 16); oled.drawLine(CX + 17, CY - 13, CX + 7, CY - 16); }
   else if (!strcmp(name, "love"))  { heart(CX - 11, CY - 9, 5); heart(CX + 11, CY - 9, 5); smile(); }
@@ -187,6 +208,36 @@ void updateTune() {
   noteStart = lastSlide = now;
   noteEnds = now + n.ms;
 }
+void stopSound() {
+  if (!sound) return;
+  if (hasMp3) mp3.stop();
+  sound = 0;
+  a3.send("sound", "off");
+  drawFace(false);
+}
+void playSound(int n) {
+  n = constrain(n, 1, 255);
+  stopTune();
+  if (!hasMp3) { a3.send("sound", "no DFPlayer"); playTune(tuneIndex("beep")); return; }
+  mp3.playMp3Folder(n);                         // mp3/0001.mp3 is 1
+  sound = n; soundSafety = millis() + 5UL * 60 * 1000;
+  a3.send("sound", n);
+  drawFace(false);
+}
+void setVolume(int v) {
+  mp3Volume = constrain(v, 0, 30);
+  if (hasMp3) mp3.volume(mp3Volume);
+  a3.send("vol", mp3Volume);
+}
+// The DFPlayer says when a recording ends; the face stops talking
+void updateSound() {
+  if (hasMp3 && mp3.available() && mp3.readType() == DFPlayerPlayFinished) { if (sound) { sound = 0; a3.send("sound", "off"); drawFace(false); } }
+  if (!sound) return;
+  if ((long)(millis() - soundSafety) > 0) { stopSound(); return; }
+  static unsigned long lastTalk = 0;
+  if (millis() - lastTalk >= 130) { lastTalk = millis(); drawFace(false); }
+}
+
 int tuneIndex(String name) {
   name.trim(); name.toLowerCase();
   if (name.length() && isDigit(name[0])) return constrain(name.toInt(), 1, TUNE_COUNT) - 1;
@@ -198,7 +249,15 @@ int tuneIndex(String name) {
 bool says(const String &said, const char *word) { return said.indexOf(word) >= 0; }
 void hear(String said) {
   said.toLowerCase();
-  if (says(said, "stop")) { stopTune(); return; }                        // "stop" / "stop music"
+  if (says(said, "stop")) { stopTune(); stopSound(); return; }           // "stop" / "stop music"
+  if (says(said, "louder")) { setVolume(mp3Volume + 4); return; }
+  if (says(said, "quieter") || says(said, "softer")) { setVolume(mp3Volume - 4); return; }
+  if (says(said, "my sound") || says(said, "my voice") || says(said, "recording") || says(said, "sound")) {
+    int n = 1;
+    for (unsigned int i = 0; i < said.length(); i++) if (isDigit(said[i])) { n = said.substring(i).toInt(); break; }
+    if (says(said, "two")) n = 2; else if (says(said, "three")) n = 3;
+    playSound(n); return;
+  }
   if (says(said, "robot talk") || says(said, "talk") || says(said, "chatter") || says(said, "beep beep")) { playTune(tuneIndex("droid")); return; }
   if (says(said, "space") || says(said, "fanfare")) { playTune(tuneIndex("voyage")); return; }
   if (says(said, "jump") || says(said, "hyper")) { playTune(tuneIndex("warp")); return; }
@@ -228,6 +287,9 @@ void setup() {
   oled.drawStr(22, 46, "waiting for app");
   oled.sendBuffer();
   if (!a3.begin("Robot Face")) Serial.println("Bluetooth LE did not start");
+  Serial1.begin(9600);                          // the DFPlayer Mini
+  hasMp3 = mp3.begin(Serial1, true, true);
+  if (hasMp3) mp3.volume(mp3Volume); else Serial.println("No DFPlayer Mini (check its wiring and microSD card)");
   randomSeed(analogRead(A3));
   face = faceIndex("sleepy");
 }
@@ -239,10 +301,11 @@ void loop() {
   if (connected != wasConnected) {
     wasConnected = connected;
     if (connected) { showFace(faceIndex("happy")); playTune(tuneIndex("beep")); }
-    else { stopTune(); face = faceIndex("sleepy"); drawFace(false); }
+    else { stopTune(); stopSound(); face = faceIndex("sleepy"); drawFace(false); }
   }
 
   updateTune();
+  updateSound();
 
   // Blink now and then (a short closed-eyes frame)
   unsigned long now = millis();
@@ -260,5 +323,10 @@ void loop() {
     else if (t == "next") playTune(lastTune + 1);
     else { int i = tuneIndex(t); if (i >= 0) playTune(i); }
   }
+  if (in.has("sound")) {
+    String t = in.get("sound"); t.toLowerCase();
+    if (t == "stop" || t == "off" || t == "0") stopSound(); else playSound(t.toInt());
+  }
+  if (in.has("vol")) setVolume(in.getInt("vol"));
   if (in.has("vc")) hear(in.get("vc"));
 }

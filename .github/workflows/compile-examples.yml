@@ -131,7 +131,7 @@ jobs:
         run: |
           arduino-cli core update-index
           arduino-cli core install arduino:renesas_uno
-          arduino-cli lib install ArduinoBLE U8g2
+          arduino-cli lib install ArduinoBLE U8g2 DFRobotDFPlayerMini
       - name: Compile
         run: |
           set +e

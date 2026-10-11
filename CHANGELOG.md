@@ -5,6 +5,7 @@
 - New example **ESP32_HID_BRIDGE** (ESP32, ESP32-S3, ESP32-C3): a Bluetooth keyboard, mouse and media remote steered from the phone over the A3Micro protocol; on the ESP32-S3 (USB-OTG) also a USB keyboard and mouse; six macros in flash, run from the app, the BOOT button or a repeat timer.
 - The library compiles on ESP32 boards: `A3MicroPacket::add` and `A3Micro::send` with a decimal number were ambiguous there.
 - The compile check covers ESP32, ESP32-S3 (with and without USB) and ESP32-C3.
+- New example **UNO_R4_WIFI_FACES_AND_TUNES**: emoji faces on an SH1106 1.3" OLED and buzzer tunes, from app buttons, sliders or voice commands (needs U8g2).
 - New example **UNO_R4_WIFI_VOICE_COMMANDS**: the A3 Micro app's voice commands (app 1.8, Pro). A control named by its label arrives as its own message; "stop" and anything else arrive as `vc:<the words>`.
 
 ## 3.0.0

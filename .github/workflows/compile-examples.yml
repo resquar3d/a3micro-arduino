@@ -119,3 +119,24 @@ jobs:
           cat build.log
           grep -E "error|Error" build.log | head -15 | while IFS= read -r line; do echo "::error::$line"; done
           exit $status
+
+  # Examples that need extra libraries: the robot face (SH1106 OLED via U8g2) on the UNO R4 WiFi
+  extras:
+    runs-on: ubuntu-latest
+    name: Compile for UNO R4 WiFi (faces and tunes)
+    steps:
+      - uses: actions/checkout@v5
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Install the board and libraries
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install arduino:renesas_uno
+          arduino-cli lib install ArduinoBLE U8g2
+      - name: Compile
+        run: |
+          set +e
+          arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi --library . examples/UNO_R4_WIFI_FACES_AND_TUNES > build.log 2>&1
+          status=$?
+          cat build.log
+          grep -E "error|Error" build.log | head -15 | while IFS= read -r line; do echo "::error::$line"; done
+          exit $status

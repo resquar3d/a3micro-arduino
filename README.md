@@ -194,6 +194,7 @@ Open them from **File > Examples > A3Micro** in the Arduino IDE.
 - **UNO_R4_WIFI_LED**: the LED from the app's `b0`
 - **UNO_R4_WIFI_SERVO**: slider `sl0` turns a servo; the board reports the angle (`angle`)
 - **UNO_R4_WIFI_WRITE_BUTTON**: a push button on the board shows in the app (`btn`)
+- **UNO_R4_WIFI_FACES_AND_TUNES**: a robot face on a 1.3" SH1106 OLED (happy, sad, love, angry, surprised, sleepy, wink, cool, laugh, neutral; it blinks) and tunes on a buzzer on pin 2 (twinkle, birthday, joy, jingle, charge, beep), from `face:<name>`, `tune:<name>` / `tune:next` / `tune:stop` or voice commands ("happy face", "play music", "next song"). Asleep without the app, awake when it connects. Needs the U8g2 library.
 - **UNO_R4_WIFI_VOICE_COMMANDS**: voice commands from the app (Pro): "light on" / "light off" / "blink" arrive as `vc` (the words) or as the button's own `b0`; "stop" always arrives as `vc:stop`
 - **UNO_R4_WIFI_HUD_DRIVE**: a two-motor robot for the app's HUD Drive layout. Direction ring `r0`, knob `j0x` / `j0y`, speed `sp0`, lights `sw0`, horn `b1`, LED `b0`, servo `sl0`, aux `sl1`; it reports its battery as `bat`. The motors stop on `stop` and when the app disconnects.
 

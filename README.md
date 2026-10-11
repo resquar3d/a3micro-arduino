@@ -20,6 +20,7 @@ This library is free and open source. The **A3 Micro app** that controls your bo
 
 - Arduino UNO R3 or UNO R4 Minima with an HM-10 Bluetooth LE module, **or**
 - Arduino UNO R4 WiFi (its own radio; uses the [ArduinoBLE](https://docs.arduino.cc/libraries/arduinoble/) library)
+- ESP32, ESP32-S3 or ESP32-C3 for the HID bridge example (esp32 boards package 2.x or 3.x)
 - The A3 Micro app for Android ([get it here](https://a3micro.twinsparks.dev/tiers.html))
 
 ## Get the A3 Micro app
@@ -194,6 +195,9 @@ Open them from **File > Examples > A3Micro** in the Arduino IDE.
 - **UNO_R4_WIFI_SERVO**: slider `sl0` turns a servo; the board reports the angle (`angle`)
 - **UNO_R4_WIFI_WRITE_BUTTON**: a push button on the board shows in the app (`btn`)
 - **UNO_R4_WIFI_HUD_DRIVE**: a two-motor robot for the app's HUD Drive layout. Direction ring `r0`, knob `j0x` / `j0y`, speed `sp0`, lights `sw0`, horn `b1`, LED `b0`, servo `sl0`, aux `sl1`; it reports its battery as `bat`. The motors stop on `stop` and when the app disconnects.
+
+**ESP32, ESP32-S3, ESP32-C3: the HID bridge**
+- **ESP32_HID_BRIDGE**: the board becomes a Bluetooth keyboard, mouse and media remote for a computer, TV or console, steered from the A3Micro Twin app's remote screen (keys `k` / `s`, media `c`, mouse `x` `y` `w` `b`, click `p`). On an ESP32-S3 built with **USB Mode: USB-OTG (TinyUSB)** it is also a USB keyboard and mouse and switches to the cable when plugged in. Six **macros** are kept in flash, e.g. `win+r | wait 400 | type notepad | key enter`, and run from the app, the BOOT button (macro 1) or a repeat timer. Pair the computer with "A3 HID Bridge" as a Bluetooth keyboard. US keyboard layout.
 
 ## Moving from version 2
 

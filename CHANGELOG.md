@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.1.0 (in testing)
+
+- New example **ESP32_HID_BRIDGE** (ESP32, ESP32-S3, ESP32-C3): a Bluetooth keyboard, mouse and media remote steered from the phone over the A3Micro protocol; on the ESP32-S3 (USB-OTG) also a USB keyboard and mouse; six macros in flash, run from the app, the BOOT button or a repeat timer.
+- The library compiles on ESP32 boards: `A3MicroPacket::add` and `A3Micro::send` with a decimal number were ambiguous there.
+- The compile check covers ESP32, ESP32-S3 (with and without USB) and ESP32-C3.
+
 ## 3.0.0
 
 - **New A3Micro protocol** (breaking): every message, in both directions, is `##;label:value,label:value;##`. Several values travel in one message, and a `;` `:` `,` `#` or `%` inside a label or value is sent as `%3B` `%3A` `%2C` `%23` `%25`. Needs the A3 Micro app 1.8 or newer.

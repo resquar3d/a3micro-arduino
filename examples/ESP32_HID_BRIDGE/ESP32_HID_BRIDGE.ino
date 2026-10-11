@@ -57,10 +57,13 @@ volatile bool usbUp = false;     // a computer has the USB cable
 #endif
 
 const char *NAME = "A3 HID Bridge";
-#if defined(CONFIG_IDF_TARGET_ESP32C3)
-const int BOOT_PIN = 9;          // the BOOT button runs macro 1
+// The BOOT button runs macro 1 (the boards package names its pin BOOT_PIN; older packages don't)
+#if defined(BOOT_PIN)
+const int MACRO_BUTTON = BOOT_PIN;
+#elif defined(CONFIG_IDF_TARGET_ESP32C3)
+const int MACRO_BUTTON = 9;
 #else
-const int BOOT_PIN = 0;
+const int MACRO_BUTTON = 0;
 #endif
 const int MACROS = 6;
 
@@ -359,7 +362,7 @@ void usbEvent(void *, esp_event_base_t base, int32_t id, void *) {
 #endif
 
 void setup() {
-  pinMode(BOOT_PIN, INPUT_PULLUP);
+  pinMode(MACRO_BUTTON, INPUT_PULLUP);
   loadMacros();
 
 #if defined(BRIDGE_USB)
@@ -415,7 +418,7 @@ void loop() {
   // The BOOT button runs macro 1 (on release, after 30 ms of steady press)
   static bool wasDown = false;
   static unsigned long downAt = 0;
-  bool down = digitalRead(BOOT_PIN) == LOW;
+  bool down = digitalRead(MACRO_BUTTON) == LOW;
   if (down && !wasDown) downAt = millis();
   if (!down && wasDown && millis() - downAt > 30) runMacro(0);
   wasDown = down;

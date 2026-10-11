@@ -4,13 +4,17 @@
  * Faces (emojis) on an SH1106 1.3" OLED, 128 x 64, drawn by the sketch (no image files), blinking now and then:
  *   happy  sad  love  angry  surprised  sleepy  wink  cool  laugh  neutral
  * Tunes on a piezo buzzer, played in the background (the robot keeps listening while it plays):
- *   twinkle  birthday  joy  jingle  charge  beep
+ *   twinkle  birthday  joy  jingle  charge  beep               traditional melodies and a start-up beep
+ *   droid  voyage  warp  laser  scan                           the robot's own sci-fi sounds: droid chatter
+ *                                                              (new every time), a space fanfare, a warp jump,
+ *                                                              laser shots, a scanner
  *
  * From the app (any of these):
  *   face:<name> or face:<0-9>     a button with Message ID "face" and On value "love", or a slider "face" 0-9
- *   tune:<name> or tune:<1-6>     a button "tune" / "twinkle"; tune:next, tune:stop
+ *   tune:<name> or tune:<1-11>    a button "tune" / "droid"; tune:next, tune:stop
  *   voice commands (A3 Micro Pro) arrive as vc:<the words>: "happy face", "show love", "play music",
- *                                 "next song", "play birthday", "stop music", "go to sleep", "wake up"
+ *                                 "next song", "play birthday", "stop music", "go to sleep", "wake up",
+ *                                 "robot talk", "beep beep", "space", "warp", "jump", "laser", "fire", "scan"
  * The board tells the app what it shows and plays: face:<name>, tune:<name> and tune:off when it ends.
  * With the app gone it falls asleep (sleepy face); when the app connects it wakes up happy.
  *
@@ -107,8 +111,10 @@ int faceIndex(String name) {
   return -1;
 }
 
-// ---------- Tunes (traditional melodies), played without stopping the rest of the sketch ----------
-struct Note { uint16_t hz, ms; };              // hz 0 = a rest
+// ---------- Tunes, played without stopping the rest of the sketch ----------
+// Traditional melodies, then the robot's own sci-fi sounds (original, written for A3Micro): droid chatter (new
+// every time), a space fanfare, a warp jump, laser shots and a scanner
+struct Note { uint16_t hz, ms, to; };          // hz 0 = a rest · to: slides from hz to this pitch (0 = a plain note)
 // Note frequencies (N_ in front: names like D4 and A4 are pins on these boards)
 const uint16_t N_C4 = 262, N_D4 = 294, N_E4 = 330, N_F4 = 349, N_G4 = 392, N_A4 = 440, N_B4 = 494, N_C5 = 523, N_D5 = 587, N_E5 = 659, N_G5 = 784;
 const Note TWINKLE[] = { {N_C4,300},{N_C4,300},{N_G4,300},{N_G4,300},{N_A4,300},{N_A4,300},{N_G4,600},{N_F4,300},{N_F4,300},{N_E4,300},{N_E4,300},{N_D4,300},{N_D4,300},{N_C4,600} };
@@ -117,36 +123,69 @@ const Note JOY[] = { {N_E4,300},{N_E4,300},{N_F4,300},{N_G4,300},{N_G4,300},{N_F
 const Note JINGLE[] = { {N_E4,250},{N_E4,250},{N_E4,500},{N_E4,250},{N_E4,250},{N_E4,500},{N_E4,250},{N_G4,250},{N_C4,250},{N_D4,250},{N_E4,1000} };
 const Note CHARGE[] = { {N_G4,150},{N_C5,150},{N_E5,150},{N_G5,300},{0,80},{N_E5,150},{N_G5,600} };
 const Note BEEP[] = { {1200,80},{0,60},{1600,80},{0,60},{2000,140},{0,80},{1500,70},{1900,160} };
+const uint16_t N_C6 = 1047;
+const Note VOYAGE[] = { {N_C5,180},{N_G5,420},{N_E5,180},{N_C5,180},{N_D5,600},{0,120},{N_G4,180},{N_C5,180},{N_E5,240},{N_G5,240},{N_C6,900} };
+const Note WARP[] = { {120,900,900},{900,500,2600},{0,60},{2600,90},{0,40},{2600,260} };
+const Note LASER[] = { {2800,140,500},{0,60},{2800,140,500},{0,60},{3200,220,350} };
+const Note SCAN[] = { {500,700,1600},{1600,700,500},{500,700,1600},{0,80},{1800,90},{0,50},{1800,90} };
+Note DROID[16];                                 // filled with new chatter each time it plays (makeDroid)
 struct Tune { const char *name; const Note *notes; uint8_t count; };
 #define TUNE(n, a) { n, a, sizeof(a) / sizeof(a[0]) }
 const Tune TUNES[] = { TUNE("twinkle", TWINKLE), TUNE("birthday", BIRTHDAY), TUNE("joy", JOY), TUNE("jingle", JINGLE),
-                       TUNE("charge", CHARGE), TUNE("beep", BEEP) };
+                       TUNE("charge", CHARGE), TUNE("beep", BEEP), TUNE("droid", DROID), TUNE("voyage", VOYAGE),
+                       TUNE("warp", WARP), TUNE("laser", LASER), TUNE("scan", SCAN) };
 const int TUNE_COUNT = sizeof(TUNES) / sizeof(TUNES[0]);
 
 int tune = -1, lastTune = -1;                   // the tune playing (-1: none), the last one played
 uint8_t noteAt = 0;
-unsigned long noteEnds = 0;
+unsigned long noteStart = 0, noteEnds = 0, lastSlide = 0;
+const Note *slide = nullptr;                    // the note sliding in pitch now
+
+// Droid chatter: quick chirps, whistles that slide up or down, and short pauses, different every time
+void makeDroid() {
+  for (Note &n : DROID) {
+    long kind = random(10);
+    if (kind < 2) n = { 0, (uint16_t)random(30, 90), 0 };                                       // a pause
+    else if (kind < 6) n = { (uint16_t)random(1400, 3600), (uint16_t)random(35, 90), 0 };      // a chirp
+    else n = { (uint16_t)random(900, 2600), (uint16_t)random(80, 220), (uint16_t)random(1200, 3800) };   // a whistle
+  }
+}
 
 bool tunePlaying() { return tune >= 0; }
 void playTune(int i) {
   tune = ((i % TUNE_COUNT) + TUNE_COUNT) % TUNE_COUNT; lastTune = tune;
-  noteAt = 0; noteEnds = 0;
+  noteAt = 0; noteEnds = 0; slide = nullptr;
+  if (TUNES[tune].notes == DROID) makeDroid();
   a3.send("tune", TUNES[tune].name);
   drawFace(false);
 }
 void stopTune() {
   if (!tunePlaying()) return;
-  noTone(BUZZER_PIN); tune = -1;
+  noTone(BUZZER_PIN); tune = -1; slide = nullptr;
   a3.send("tune", "off");
   drawFace(false);
 }
 void updateTune() {
-  if (!tunePlaying() || millis() < noteEnds) return;
+  if (!tunePlaying()) return;
+  unsigned long now = millis();
+  if (now < noteEnds) {
+    // A sliding note: a new pitch every 8 ms on the way from hz to to
+    if (slide && now - lastSlide >= 8) {
+      long hz = slide->hz + ((long)slide->to - slide->hz) * (long)(now - noteStart) / slide->ms;
+      tone(BUZZER_PIN, (unsigned int)max(31L, hz));
+      lastSlide = now;
+    }
+    return;
+  }
   const Tune &t = TUNES[tune];
   if (noteAt >= t.count) { stopTune(); return; }
   const Note &n = t.notes[noteAt++];
-  if (n.hz) tone(BUZZER_PIN, n.hz, n.ms * 9 / 10); else noTone(BUZZER_PIN);
-  noteEnds = millis() + n.ms;
+  slide = (n.hz && n.to) ? &n : nullptr;
+  if (!n.hz) noTone(BUZZER_PIN);
+  else if (slide) tone(BUZZER_PIN, n.hz);                                    // held; updateTune slides it
+  else tone(BUZZER_PIN, n.hz, n.ms * 9 / 10);
+  noteStart = lastSlide = now;
+  noteEnds = now + n.ms;
 }
 int tuneIndex(String name) {
   name.trim(); name.toLowerCase();
@@ -160,6 +199,10 @@ bool says(const String &said, const char *word) { return said.indexOf(word) >= 0
 void hear(String said) {
   said.toLowerCase();
   if (says(said, "stop")) { stopTune(); return; }                        // "stop" / "stop music"
+  if (says(said, "robot talk") || says(said, "talk") || says(said, "chatter") || says(said, "beep beep")) { playTune(tuneIndex("droid")); return; }
+  if (says(said, "space") || says(said, "fanfare")) { playTune(tuneIndex("voyage")); return; }
+  if (says(said, "jump") || says(said, "hyper")) { playTune(tuneIndex("warp")); return; }
+  if (says(said, "shoot") || says(said, "fire") || says(said, "pew")) { playTune(tuneIndex("laser")); return; }
   for (int i = 0; i < TUNE_COUNT; i++) if (says(said, TUNES[i].name)) { playTune(i); return; }
   if (says(said, "next") || says(said, "another")) { playTune(lastTune + 1); return; }
   if (says(said, "music") || says(said, "song") || says(said, "play") || says(said, "sing")) { playTune(lastTune < 0 ? 0 : lastTune); return; }
